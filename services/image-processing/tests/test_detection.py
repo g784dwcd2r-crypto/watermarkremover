@@ -265,3 +265,59 @@ def test_empty_corner_is_not_a_signature(painting):
     _, box = demo.add_signature(painting)
     regions = detect_protected_regions(painting, candidate_boxes=[box])
     assert "signature" not in _kinds(regions)
+
+
+# -- graded watermark evidence ---------------------------------------------
+
+
+@pytest.mark.parametrize("size", [(300, 220), (360, 260), (560, 400), (900, 640)])
+def test_tiled_watermark_is_caught_at_every_size(size):
+    """Fewer tiles in frame weakens the lattice signal but must not hide it."""
+    width, height = size
+    watermarked = demo.add_stock_watermark(demo.painted_illustration(width, height))
+    regions = detect_protected_regions(watermarked)
+    stock = [region for region in regions if region.kind == "stock_watermark"]
+    assert stock, f"missed the watermark at {size}"
+
+    mask = _box_mask(watermarked.shape[:2], (30, 30, 80, 40))
+    assessment = assess_mask(mask, regions)
+    assert assessment.blocked is True
+
+
+@pytest.mark.parametrize(
+    "generator",
+    [
+        lambda w, h: demo.painted_illustration(w, h),
+        lambda w, h: demo.woven_texture(w, h),
+        lambda w, h: demo.flat_gradient(w, h),
+        lambda w, h: demo.line_artwork(min(w, h), min(w, h)),
+    ],
+)
+@pytest.mark.parametrize("size", [(300, 220), (560, 400)])
+def test_clean_artwork_is_never_flagged_as_a_watermark(generator, size):
+    """Periodic weave and hatched line work must not read as a licensing overlay."""
+    image = generator(*size)
+    regions = detect_protected_regions(image)
+    assert "stock_watermark" not in _kinds(regions)
+
+
+def test_strong_evidence_blocks_and_moderate_evidence_asks(painting):
+    """A clear lattice is refused outright; a marginal one pauses for a check."""
+    from artrestore_imaging.detection import SEVERITY_BLOCK, SEVERITY_REVIEW
+
+    large = demo.add_stock_watermark(demo.painted_illustration(900, 640))
+    small = demo.add_stock_watermark(demo.painted_illustration(300, 220))
+
+    strong = [r for r in detect_protected_regions(large) if r.kind == "stock_watermark"]
+    moderate = [r for r in detect_protected_regions(small) if r.kind == "stock_watermark"]
+    assert strong and strong[0].severity == SEVERITY_BLOCK
+    assert moderate and moderate[0].severity == SEVERITY_REVIEW
+
+    mask = _box_mask(small.shape[:2], (20, 20, 60, 30))
+    paused = assess_mask(mask, moderate)
+    assert paused.requires_acknowledgement is True
+    cleared = assess_mask(mask, moderate, acknowledged_kinds=["stock_watermark"])
+    assert cleared.blocked is False
+
+    big_mask = _box_mask(large.shape[:2], (20, 20, 60, 30))
+    assert assess_mask(big_mask, strong, acknowledged_kinds=["stock_watermark"]).blocked is True

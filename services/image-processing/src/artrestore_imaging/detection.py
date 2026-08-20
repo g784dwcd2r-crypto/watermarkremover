@@ -80,7 +80,11 @@ class DetectionConfig:
     signature_max_axis_alignment: float = 0.55
     stock_area_fraction: float = 0.18
     stock_span_fraction: float = 0.55
-    repeated_pattern_peaks: int = 3
+    #: Autocorrelation peak that makes a tiled overlay unambiguous.
+    pattern_strong_peak: float = 0.40
+    #: A weaker lattice still worth pausing on when the orientation agrees.
+    pattern_weak_peak: float = 0.20
+    pattern_min_diagonal_energy: float = 0.40
     text_min_height: int = 6
     ocr_enabled: bool = True
 
@@ -470,21 +474,33 @@ def _repeated_pattern_score(gray: np.ndarray, config: DetectionConfig) -> dict:
                 diagonal += 1
     diagonal_energy = diagonal / float(len(segments) or 1)
 
-    periodic = secondary_peak_ratio >= 0.40
-    oriented = diagonal_energy >= 0.40 and diagonal >= 10
-    score = 0.0
-    if periodic:
-        score += 0.35
-    if oriented:
-        score += 0.35
-    if periodic and oriented:
-        score += 0.3  # both signals agree: this is a tiled overlay
+    # How many tiles fit in frame decides how strong the lattice signal can be:
+    # a watermark repeated twice across a small image autocorrelates far more
+    # weakly than the same watermark across a full-size one. Rather than pick a
+    # single threshold that is either blind on small images or trigger-happy on
+    # large ones, the evidence is graded.
+    oriented = diagonal_energy >= config.pattern_min_diagonal_energy and diagonal >= 10
+    strong_lattice = secondary_peak_ratio >= config.pattern_strong_peak
+    weak_lattice = secondary_peak_ratio >= config.pattern_weak_peak
+
+    if oriented and strong_lattice:
+        score, confidence_tier = 1.0, "strong"
+    elif oriented and weak_lattice:
+        score, confidence_tier = 0.55, "moderate"
+    elif oriented or strong_lattice:
+        # One signal alone is ordinary content: a woven canvas is periodic
+        # without being oriented, hatched line art is oriented without being
+        # periodic. Neither is a watermark.
+        score, confidence_tier = 0.35, "weak"
+    else:
+        score, confidence_tier = 0.0, "none"
 
     return {
         "secondary_peak_ratio": round(secondary_peak_ratio, 3),
         "diagonal_energy": round(float(diagonal_energy), 3),
         "diagonal_lines": int(diagonal),
-        "score": round(min(score, 1.0), 3),
+        "score": round(score, 3),
+        "confidence_tier": confidence_tier,
     }
 
 
@@ -540,6 +556,7 @@ def detect_protected_regions(
     # 2. Whole-image stock watermark: a large, repeating, low-contrast overlay.
     pattern = _repeated_pattern_score(gray, config)
     if pattern["score"] >= 0.5:
+        strong = pattern["confidence_tier"] == "strong"
         found.append(
             Region(
                 kind="stock_watermark",
@@ -548,9 +565,16 @@ def detect_protected_regions(
                 width=int(width),
                 height=int(height),
                 confidence=min(0.95, 0.55 + pattern["score"] / 2.0),
+                severity=SEVERITY_BLOCK if strong else SEVERITY_REVIEW,
                 reason=(
                     "A large repeating overlay covering the image was detected. This looks like a "
                     "stock-agency or licensing watermark, which this product does not remove."
+                    if strong
+                    else (
+                        "A repeating diagonal overlay was detected across the image. That is the "
+                        "shape of a licensing watermark, though it is also the shape of some "
+                        "patterned artwork, so processing is paused for confirmation."
+                    )
                 ),
                 evidence=pattern,
             )
