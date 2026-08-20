@@ -1,0 +1,28 @@
+{
+  "name": "artrestore-studio",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ArtRestore Studio - authorized visible watermark cleanup and reconstructed artwork timelapses.",
+  "workspaces": [
+    "apps/web",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@artrestore/web",
+    "build": "npm run build --workspace=@artrestore/web",
+    "start": "npm run start --workspace=@artrestore/web",
+    "lint": "npm run lint --workspace=@artrestore/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
+    "test": "npm run test --workspace=@artrestore/web",
+    "test:e2e": "npm run test:e2e --workspace=@artrestore/web"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "prettier-plugin-tailwindcss": "^0.6.11"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

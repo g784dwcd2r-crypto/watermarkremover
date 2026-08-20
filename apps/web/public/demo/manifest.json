@@ -1,0 +1,37 @@
+{
+  "generator": "artrestore_imaging.demo",
+  "seed": 20260115,
+  "license": "Generated procedurally for this repository; no third-party rights apply.",
+  "protected_boxes": {
+    "painted-landscape-signed.jpg": {
+      "signature": [
+        918,
+        858,
+        388,
+        44
+      ]
+    },
+    "painted-landscape-credit.jpg": {
+      "copyright_notice": [
+        486,
+        940,
+        428,
+        31
+      ]
+    }
+  },
+  "files": [
+    "alpha-sticker.png",
+    "backdrop-clean.jpg",
+    "backdrop-datestamp-mask.png",
+    "backdrop-datestamp.jpg",
+    "canvas-texture-badge-mask.png",
+    "canvas-texture-badge.jpg",
+    "canvas-texture-clean.jpg",
+    "line-artwork.jpg",
+    "painted-landscape-credit.jpg",
+    "painted-landscape-signed.jpg",
+    "painted-landscape-stock.jpg",
+    "painted-landscape.jpg"
+  ]
+}

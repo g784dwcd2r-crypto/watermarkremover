@@ -1,0 +1,46 @@
+# Node
+node_modules/
+.next/
+out/
+dist/
+.turbo/
+*.tsbuildinfo
+playwright-report/
+test-results/
+.playwright/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Local data
+.env
+.env.local
+*.local
+/var/
+/storage-data/
+/tmp-uploads/
+*.sqlite3
+*.db
+
+# Models (large binaries are never committed)
+models/*.pt
+models/*.pth
+models/*.onnx
+models/*.ckpt
+models/*.safetensors
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "artrestore-imaging"
+version = "0.1.0"
+description = "Image validation, protected-region detection and authorized inpainting pipelines for ArtRestore Studio."
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=1.26",
+  "opencv-python-headless>=4.9",
+  "pillow>=10.2",
+]
+
+[project.optional-dependencies]
+neural = ["torch>=2.2"]
+ocr = ["pytesseract>=0.3.10"]
+dev = ["pytest>=8.0", "pytest-cov>=5.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
