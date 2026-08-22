@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import itertools
+
 import numpy as np
 import pytest
-
 from artrestore_timelapse import (
     MODES,
     REVEAL_KINDS,
@@ -21,7 +22,6 @@ from artrestore_timelapse import (
     render_strokes,
 )
 from artrestore_timelapse.errors import InvalidPlanError, RenderCancelledError
-
 
 # -- plans ------------------------------------------------------------------
 
@@ -53,7 +53,9 @@ def test_unknown_mode_is_rejected():
 
 
 def test_duration_is_clamped_to_the_supported_range():
-    assert plan_duration(build_plan("paint_reveal", total_seconds=1)) == pytest.approx(5.0, abs=0.05)
+    assert plan_duration(build_plan("paint_reveal", total_seconds=1)) == pytest.approx(
+        5.0, abs=0.05
+    )
     assert plan_duration(build_plan("paint_reveal", total_seconds=9999)) == pytest.approx(
         300.0, abs=0.5
     )
@@ -85,7 +87,7 @@ def test_describe_plan_reports_timing_windows():
     described = describe_plan(build_plan("layer_build", total_seconds=12))
     assert described[0]["starts_at"] == 0.0
     assert described[-1]["ends_at"] == pytest.approx(12.0, abs=0.05)
-    for earlier, later in zip(described, described[1:]):
+    for earlier, later in itertools.pairwise(described):
         assert earlier["ends_at"] == pytest.approx(later["starts_at"], abs=1e-6)
 
 
@@ -185,8 +187,14 @@ def test_render_starts_blank_and_ends_on_the_artwork(analysis):
     renderer = TimelapseRenderer(
         analysis,
         stages,
-        RenderOptions(fps=24, seed=3, preview=True, preview_max_side=180,
-                      end_card_disclosure=False, background_colour="#FFFFFF"),
+        RenderOptions(
+            fps=24,
+            seed=3,
+            preview=True,
+            preview_max_side=180,
+            end_card_disclosure=False,
+            background_colour="#FFFFFF",
+        ),
     )
     frames = list(renderer.iter_frames())
     assert frames[0].mean() > 200, "the first frame should be close to the blank canvas"
@@ -232,7 +240,7 @@ def test_same_seed_produces_identical_frames(analysis):
 
     first, second = render(), render()
     assert len(first) == len(second)
-    assert all(np.array_equal(a, b) for a, b in zip(first, second))
+    assert all(np.array_equal(a, b) for a, b in zip(first, second, strict=True))
 
 
 def test_different_seeds_produce_different_frames(analysis):
@@ -245,12 +253,13 @@ def test_different_seeds_produce_different_frames(analysis):
         return list(renderer.iter_frames())
 
     first, second = render(1), render(2)
-    assert any(not np.array_equal(a, b) for a, b in zip(first, second))
+    assert any(not np.array_equal(a, b) for a, b in zip(first, second, strict=True))
 
 
 def test_end_card_is_enabled_by_default(analysis):
     renderer = TimelapseRenderer(
-        analysis, build_plan("paint_reveal", total_seconds=5),
+        analysis,
+        build_plan("paint_reveal", total_seconds=5),
         RenderOptions(fps=24, seed=3, preview=True, preview_max_side=200),
     )
     assert renderer.plan.end_card_frames > 0
@@ -264,7 +273,8 @@ def test_end_card_is_enabled_by_default(analysis):
 
 def test_end_card_can_be_disabled(analysis):
     renderer = TimelapseRenderer(
-        analysis, build_plan("paint_reveal", total_seconds=5),
+        analysis,
+        build_plan("paint_reveal", total_seconds=5),
         RenderOptions(fps=24, seed=3, preview=True, end_card_disclosure=False),
     )
     assert renderer.plan.end_card_frames == 0
@@ -274,7 +284,8 @@ def test_canvas_presets_change_the_output_shape(analysis):
     shapes = {}
     for preset in ("square", "portrait_4x5", "vertical_9x16", "landscape_16x9"):
         renderer = TimelapseRenderer(
-            analysis, build_plan("paint_reveal", total_seconds=5),
+            analysis,
+            build_plan("paint_reveal", total_seconds=5),
             RenderOptions(fps=24, preset=preset, seed=1),
         )
         shapes[preset] = (renderer.plan.width, renderer.plan.height)
@@ -286,7 +297,8 @@ def test_canvas_presets_change_the_output_shape(analysis):
 
 def test_source_preset_follows_the_artwork_aspect(analysis):
     renderer = TimelapseRenderer(
-        analysis, build_plan("paint_reveal", total_seconds=5),
+        analysis,
+        build_plan("paint_reveal", total_seconds=5),
         RenderOptions(fps=24, preset="source", seed=1),
     )
     source_ratio = analysis.rgb.shape[1] / analysis.rgb.shape[0]
@@ -297,7 +309,8 @@ def test_source_preset_follows_the_artwork_aspect(analysis):
 def test_output_dimensions_are_even_for_h264(analysis):
     """yuv420p requires even dimensions; odd sizes would fail at encode time."""
     renderer = TimelapseRenderer(
-        analysis, build_plan("paint_reveal", total_seconds=5),
+        analysis,
+        build_plan("paint_reveal", total_seconds=5),
         RenderOptions(fps=30, preset="source", seed=1, preview=True, preview_max_side=181),
     )
     assert renderer.plan.width % 2 == 0
@@ -313,8 +326,9 @@ def test_real_intermediates_use_the_uploaded_images(analysis):
     renderer = TimelapseRenderer(
         analysis,
         stages,
-        RenderOptions(fps=24, seed=3, preview=True, preview_max_side=160,
-                      end_card_disclosure=False),
+        RenderOptions(
+            fps=24, seed=3, preview=True, preview_max_side=160, end_card_disclosure=False
+        ),
         intermediates=stage_images,
     )
     frames = list(renderer.iter_frames())
@@ -322,7 +336,10 @@ def test_real_intermediates_use_the_uploaded_images(analysis):
     # Sample the centre of the canvas, away from the letterbox bars, and look
     # for the artist's own stage rather than a generated approximation of it.
     height, width = frames[0].shape[:2]
-    centre = (slice(int(height * 0.4), int(height * 0.6)), slice(int(width * 0.4), int(width * 0.6)))
+    centre = (
+        slice(int(height * 0.4), int(height * 0.6)),
+        slice(int(width * 0.4), int(width * 0.6)),
+    )
     centres = [float(frame[centre].mean()) for frame in frames]
     assert min(centres) < 55, "the first uploaded stage never appeared"
     assert any(abs(value - 120) < 20 for value in centres), "the second stage never appeared"
@@ -332,7 +349,8 @@ def test_missing_intermediate_holds_rather_than_substituting(analysis):
     """An absent upload must not be replaced by a generated stand-in."""
     stages = build_plan("real_intermediates", total_seconds=6, intermediate_count=2)
     renderer = TimelapseRenderer(
-        analysis, stages,
+        analysis,
+        stages,
         RenderOptions(fps=24, seed=3, preview=True, preview_max_side=160),
         intermediates=[],
     )
@@ -344,8 +362,9 @@ def test_zoom_pan_and_cursor_options_render(analysis):
     renderer = TimelapseRenderer(
         analysis,
         build_plan("hand_drawn_strokes", total_seconds=5),
-        RenderOptions(fps=24, seed=3, preview=True, preview_max_side=160,
-                      zoom_pan=True, show_cursor=True),
+        RenderOptions(
+            fps=24, seed=3, preview=True, preview_max_side=160, zoom_pan=True, show_cursor=True
+        ),
     )
     frames = list(renderer.iter_frames())
     assert len(frames) == renderer.plan.total_frames
@@ -356,13 +375,19 @@ def test_brand_watermark_is_composited(analysis):
     mark[:, :, :3] = 255
     mark[:, :, 3] = 255
     options = RenderOptions(fps=24, seed=3, preview=True, preview_max_side=240)
-    plain = list(TimelapseRenderer(analysis, build_plan("paint_reveal", total_seconds=5), options).iter_frames())
+    plain = list(
+        TimelapseRenderer(
+            analysis, build_plan("paint_reveal", total_seconds=5), options
+        ).iter_frames()
+    )
 
     branded_options = RenderOptions(
         fps=24, seed=3, preview=True, preview_max_side=240, brand_watermark=mark
     )
     branded = list(
-        TimelapseRenderer(analysis, build_plan("paint_reveal", total_seconds=5), branded_options).iter_frames()
+        TimelapseRenderer(
+            analysis, build_plan("paint_reveal", total_seconds=5), branded_options
+        ).iter_frames()
     )
     assert not np.array_equal(plain[10], branded[10])
 

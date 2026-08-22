@@ -10,7 +10,6 @@ from __future__ import annotations
 import cv2
 import numpy as np
 import pytest
-
 from artrestore_imaging import demo
 from artrestore_imaging.detection import (
     PROTECTED_KINDS,
@@ -209,7 +208,9 @@ def test_stroke_statistics_on_empty_crop():
 
 def test_subtract_protected_removes_the_region():
     mask = np.full((100, 100), 255, np.uint8)
-    region = Region(kind="signature", x=10, y=10, width=20, height=20, confidence=0.9, reason="test")
+    region = Region(
+        kind="signature", x=10, y=10, width=20, height=20, confidence=0.9, reason="test"
+    )
     result = subtract_protected(mask, [region])
     assert result[15, 15] == 0
     assert result[80, 80] == 255

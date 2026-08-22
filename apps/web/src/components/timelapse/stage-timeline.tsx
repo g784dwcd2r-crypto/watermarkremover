@@ -63,16 +63,16 @@ export function StageTimeline({
   };
 
   const update = (index: number, patch: Partial<EditableStage>) => {
-    onChange(stages.map((stage, position) => (position === index ? { ...stage, ...patch } : stage)));
+    onChange(
+      stages.map((stage, position) => (position === index ? { ...stage, ...patch } : stage)),
+    );
   };
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-[var(--color-ink)]">Stage timeline</h3>
-        <Badge tone={outOfRange ? "danger" : "primary"}>
-          Total {formatDuration(total)}
-        </Badge>
+        <Badge tone={outOfRange ? "danger" : "primary"}>Total {formatDuration(total)}</Badge>
       </div>
 
       {outOfRange ? (

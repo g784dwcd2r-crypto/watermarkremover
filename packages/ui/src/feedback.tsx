@@ -7,7 +7,10 @@ import { cn } from "./utils";
 export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("animate-pulse rounded-[var(--radius-md)] bg-[var(--color-paper-sunken)]", className)}
+      className={cn(
+        "animate-pulse rounded-[var(--radius-md)] bg-[var(--color-paper-sunken)]",
+        className,
+      )}
       aria-hidden="true"
       {...props}
     />
@@ -24,7 +27,13 @@ export function VisuallyHidden({ children }: { children: React.ReactNode }) {
  * Rendered once near the top of the app so processing updates from anywhere in
  * the tree land in a single, predictable place for screen readers.
  */
-export function LiveRegion({ message, assertive = false }: { message: string; assertive?: boolean }) {
+export function LiveRegion({
+  message,
+  assertive = false,
+}: {
+  message: string;
+  assertive?: boolean;
+}) {
   return (
     <div
       role="status"

@@ -6,9 +6,30 @@ import { describe, expect, it, vi } from "vitest";
 import { StageTimeline, type EditableStage } from "@/components/timelapse/stage-timeline";
 
 const stages: EditableStage[] = [
-  { stage_type: "blank_canvas", label: "Blank canvas", order_index: 0, duration: 1, enabled: true, settings: {} },
-  { stage_type: "base_colours", label: "Base colours", order_index: 1, duration: 4, enabled: true, settings: {} },
-  { stage_type: "final_hold", label: "Finished artwork", order_index: 2, duration: 2, enabled: true, settings: {} },
+  {
+    stage_type: "blank_canvas",
+    label: "Blank canvas",
+    order_index: 0,
+    duration: 1,
+    enabled: true,
+    settings: {},
+  },
+  {
+    stage_type: "base_colours",
+    label: "Base colours",
+    order_index: 1,
+    duration: 4,
+    enabled: true,
+    settings: {},
+  },
+  {
+    stage_type: "final_hold",
+    label: "Finished artwork",
+    order_index: 2,
+    duration: 2,
+    enabled: true,
+    settings: {},
+  },
 ];
 
 function Harness({ initial = stages }: { initial?: EditableStage[] }) {
@@ -39,7 +60,14 @@ describe("StageTimeline", () => {
     render(
       <Harness
         initial={[
-          { stage_type: "final_hold", label: "Hold", order_index: 0, duration: 2, enabled: true, settings: {} },
+          {
+            stage_type: "final_hold",
+            label: "Hold",
+            order_index: 0,
+            duration: 2,
+            enabled: true,
+            settings: {},
+          },
         ]}
       />,
     );
@@ -59,7 +87,14 @@ describe("StageTimeline", () => {
     render(
       <Harness
         initial={[
-          { stage_type: "blank_canvas", label: "Blank", order_index: 0, duration: 1, enabled: true, settings: {} },
+          {
+            stage_type: "blank_canvas",
+            label: "Blank",
+            order_index: 0,
+            duration: 1,
+            enabled: true,
+            settings: {},
+          },
           {
             stage_type: "real_intermediate",
             label: "Artist stage 1",

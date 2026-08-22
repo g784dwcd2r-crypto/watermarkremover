@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import pytest
-
 from artrestore_imaging import demo
-
 
 
 @pytest.fixture
@@ -44,7 +42,9 @@ def test_options_describe_modes_and_disclosure(api, timelapse_project):
         "real_intermediates",
     }
     assert body["disclosure"]["end_card_default"] is True
-    assert body["disclosure"]["reconstruction_type"] == "AI-assisted reconstructed artwork timelapse"
+    assert (
+        body["disclosure"]["reconstruction_type"] == "AI-assisted reconstructed artwork timelapse"
+    )
     assert "cannot be turned off" in body["disclosure"]["note"]
     assert body["fps_options"] == [24, 30, 60]
 
@@ -55,9 +55,7 @@ def test_analysis_creates_an_editable_timeline(api, timelapse_project, assert_jo
         json={"mode": "sketch_to_colour", "seed": 3},
     )
     assert response.status_code == 202
-    job = api.get(
-        f"/v1/projects/{timelapse_project['id']}/jobs/{response.json()['id']}"
-    ).json()
+    job = api.get(f"/v1/projects/{timelapse_project['id']}/jobs/{response.json()['id']}").json()
     assert_job_succeeded(job)
     assert job["result"]["analysis"]["palette"]
 
@@ -69,9 +67,7 @@ def test_analysis_creates_an_editable_timeline(api, timelapse_project, assert_jo
 
 def test_analysis_requires_ownership_confirmation(api):
     project = api.create_project(project_type="timelapse")
-    api.upload_image(
-        project["id"], demo.to_png(demo.flat_gradient(120, 90)), confirm=False
-    )
+    api.upload_image(project["id"], demo.to_png(demo.flat_gradient(120, 90)), confirm=False)
     response = api.post(
         f"/v1/projects/{project['id']}/timelapse/analyze", json={"mode": "paint_reveal"}
     )
@@ -156,9 +152,7 @@ def test_render_produces_a_video_export(api, timelapse_project, assert_job_succe
         json=_render_payload(formats=["mp4", "poster", "project_json"]),
     )
     assert response.status_code == 202, response.text
-    job = api.get(
-        f"/v1/projects/{timelapse_project['id']}/jobs/{response.json()['id']}"
-    ).json()
+    job = api.get(f"/v1/projects/{timelapse_project['id']}/jobs/{response.json()['id']}").json()
     assert_job_succeeded(job)
 
     result = job["result"]
@@ -175,9 +169,7 @@ def test_render_produces_a_video_export(api, timelapse_project, assert_job_succe
 
 
 def test_render_records_the_disclosure_consent(api, timelapse_project):
-    api.post(
-        f"/v1/projects/{timelapse_project['id']}/timelapse/render", json=_render_payload()
-    )
+    api.post(f"/v1/projects/{timelapse_project['id']}/timelapse/render", json=_render_payload())
     consents = api.get(f"/v1/projects/{timelapse_project['id']}/consent").json()
     disclosures = [
         record for record in consents if record["consent_type"] == "timelapse_disclosure"
@@ -215,9 +207,7 @@ def test_rendered_mp4_is_valid_and_labelled(api, timelapse_project, tmp_path, as
         f"/v1/projects/{timelapse_project['id']}/timelapse/render",
         json=_render_payload(preset="vertical_9x16", fps=30),
     )
-    job = api.get(
-        f"/v1/projects/{timelapse_project['id']}/jobs/{response.json()['id']}"
-    ).json()
+    job = api.get(f"/v1/projects/{timelapse_project['id']}/jobs/{response.json()['id']}").json()
     assert_job_succeeded(job)
 
     export_id = next(
@@ -245,9 +235,7 @@ def test_preview_render_is_smaller_and_faster(api, timelapse_project, assert_job
         f"/v1/projects/{timelapse_project['id']}/timelapse/preview",
         json=_render_payload(preset="square", idempotency_key="p1"),
     )
-    job = api.get(
-        f"/v1/projects/{timelapse_project['id']}/jobs/{preview.json()['id']}"
-    ).json()
+    job = api.get(f"/v1/projects/{timelapse_project['id']}/jobs/{preview.json()['id']}").json()
     assert_job_succeeded(job)
     assert job["result"]["preview"] is True
     assert job["result"]["width"] <= 1080
@@ -255,9 +243,7 @@ def test_preview_render_is_smaller_and_faster(api, timelapse_project, assert_job
 
 def test_preview_does_not_record_a_publication_disclosure(api, timelapse_project):
     """Only a final render is a publishable artefact, so only it takes the attestation."""
-    api.post(
-        f"/v1/projects/{timelapse_project['id']}/timelapse/preview", json=_render_payload()
-    )
+    api.post(f"/v1/projects/{timelapse_project['id']}/timelapse/preview", json=_render_payload())
     consents = api.get(f"/v1/projects/{timelapse_project['id']}/consent").json()
     assert not [c for c in consents if c["consent_type"] == "timelapse_disclosure"]
 
@@ -272,8 +258,12 @@ def test_render_respects_a_saved_timeline(api, timelapse_project, assert_job_suc
         json={
             "stages": [
                 {"stage_type": "blank_canvas", "order_index": 0, "duration": 1.0},
-                {"stage_type": "texture_details", "order_index": 1, "duration": 5.0,
-                 "settings": {"reveal": "organic"}},
+                {
+                    "stage_type": "texture_details",
+                    "order_index": 1,
+                    "duration": 5.0,
+                    "settings": {"reveal": "organic"},
+                },
             ]
         },
     )
@@ -281,9 +271,7 @@ def test_render_respects_a_saved_timeline(api, timelapse_project, assert_job_suc
         f"/v1/projects/{timelapse_project['id']}/timelapse/render",
         json=_render_payload(duration_seconds=6.0),
     )
-    job = api.get(
-        f"/v1/projects/{timelapse_project['id']}/jobs/{response.json()['id']}"
-    ).json()
+    job = api.get(f"/v1/projects/{timelapse_project['id']}/jobs/{response.json()['id']}").json()
     assert_job_succeeded(job)
     assert [stage["stage_type"] for stage in job["result"]["stages"]] == [
         "blank_canvas",
@@ -302,9 +290,7 @@ def test_render_is_deterministic_for_a_seed(api, timelapse_project, assert_job_s
             f"/v1/projects/{timelapse_project['id']}/timelapse/render",
             json=_render_payload(seed=99, idempotency_key=f"run-{attempt}"),
         )
-        job = api.get(
-            f"/v1/projects/{timelapse_project['id']}/jobs/{response.json()['id']}"
-        ).json()
+        job = api.get(f"/v1/projects/{timelapse_project['id']}/jobs/{response.json()['id']}").json()
         assert_job_succeeded(job)
         export_id = next(
             entry["export_id"] for entry in job["result"]["exports"] if entry["output"] == "mp4"
@@ -318,9 +304,7 @@ def test_render_is_deterministic_for_a_seed(api, timelapse_project, assert_job_s
 def test_render_requires_ownership_confirmation(api):
     project = api.create_project(project_type="timelapse")
     api.upload_image(project["id"], demo.to_png(demo.flat_gradient(120, 90)), confirm=False)
-    response = api.post(
-        f"/v1/projects/{project['id']}/timelapse/render", json=_render_payload()
-    )
+    response = api.post(f"/v1/projects/{project['id']}/timelapse/render", json=_render_payload())
     assert response.status_code == 403
 
 

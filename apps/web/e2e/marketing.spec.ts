@@ -6,9 +6,7 @@ test.describe("marketing pages", () => {
   test("the landing page explains the authorized-use restriction", async ({ page }) => {
     await page.goto("/");
 
-    await expect(
-      page.getByRole("heading", { name: /clean up your own images/i }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: /clean up your own images/i })).toBeVisible();
     await expect(page.getByText(/I own this image or have permission to edit it/i)).toBeVisible();
 
     // The refusal list is on the landing page, not buried in a policy.
@@ -23,9 +21,7 @@ test.describe("marketing pages", () => {
     await slider.focus();
     const before = await slider.inputValue();
     await slider.press("ArrowRight");
-    await expect
-      .poll(async () => await slider.inputValue())
-      .not.toBe(before);
+    await expect.poll(async () => await slider.inputValue()).not.toBe(before);
   });
 
   test("policy pages are reachable and dated", async ({ page }) => {

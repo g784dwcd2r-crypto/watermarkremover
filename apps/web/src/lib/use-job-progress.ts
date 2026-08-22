@@ -47,7 +47,9 @@ export function useJobProgress(projectId: string, jobId: string | null): JobProg
   React.useEffect(() => {
     if (!projectId || !jobId) return;
 
-    const setState = (next: JobProgressState | ((previous: JobProgressState) => JobProgressState)) =>
+    const setState = (
+      next: JobProgressState | ((previous: JobProgressState) => JobProgressState),
+    ) =>
       setTracked((current) => {
         const base = current && current.jobId === jobId ? current.state : IDLE;
         return { jobId, state: typeof next === "function" ? next(base) : next };

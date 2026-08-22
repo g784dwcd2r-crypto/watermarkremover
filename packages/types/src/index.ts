@@ -13,28 +13,16 @@ export type ProjectType = "cleanup" | "timelapse";
 export type ProjectStatus = "draft" | "ready" | "processing" | "complete" | "failed";
 export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 export type JobType =
-  | "cleanup"
-  | "timelapse_analyze"
-  | "timelapse_preview"
-  | "timelapse_render"
-  | "export";
+  "cleanup" | "timelapse_analyze" | "timelapse_preview" | "timelapse_render" | "export";
 export type RetentionDays = 1 | 7 | 30;
 
 export type CleanupMode = "fast_fill" | "texture_restore" | "edge_aware" | "art_mode";
 
 export type TimelapseMode =
-  | "sketch_to_colour"
-  | "paint_reveal"
-  | "layer_build"
-  | "hand_drawn_strokes"
-  | "real_intermediates";
+  "sketch_to_colour" | "paint_reveal" | "layer_build" | "hand_drawn_strokes" | "real_intermediates";
 
 export type CanvasPresetKey =
-  | "square"
-  | "portrait_4x5"
-  | "vertical_9x16"
-  | "landscape_16x9"
-  | "source";
+  "square" | "portrait_4x5" | "vertical_9x16" | "landscape_16x9" | "source";
 
 export type AssetType =
   | "source"
@@ -52,11 +40,7 @@ export type AssetType =
 
 /** Region kinds the product refuses to reconstruct over. */
 export type ProtectedKind =
-  | "signature"
-  | "copyright_notice"
-  | "stock_watermark"
-  | "agency_mark"
-  | "provenance_label";
+  "signature" | "copyright_notice" | "stock_watermark" | "agency_mark" | "provenance_label";
 
 /**
  * `block` cannot be overridden. `review` pauses for an explicit attestation,

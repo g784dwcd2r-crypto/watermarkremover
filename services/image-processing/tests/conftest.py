@@ -6,9 +6,8 @@ import io
 
 import numpy as np
 import pytest
-from PIL import Image
-
 from artrestore_imaging import demo
+from PIL import Image
 
 
 @pytest.fixture(scope="session")

@@ -5,9 +5,6 @@ from __future__ import annotations
 import hashlib
 import logging
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from artrestore_imaging import (
     ImagingError,
     describe_metadata,
@@ -17,6 +14,8 @@ from artrestore_imaging import (
     load_safe_raster,
     validate_image_bytes,
 )
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..errors import APIError, not_found, validation_error
@@ -74,7 +73,7 @@ def finalise_upload(db: Session, *, project: Project, asset: Asset, storage: Sto
     settings = get_settings()
     try:
         data = storage.get_bytes(asset.storage_key)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise validation_error(
             "The upload did not arrive. Try uploading the file again.",
             details={"asset_id": asset.id},
@@ -196,9 +195,7 @@ def analysis_payload(asset: Asset) -> dict:
             "removed here."
         )
     if provenance.get("exif_rights"):
-        warnings.append(
-            "Authorship metadata is present in EXIF. It travels with every export."
-        )
+        warnings.append("Authorship metadata is present in EXIF. It travels with every export.")
     if metadata.get("orientation_corrected"):
         warnings.append("EXIF orientation was applied so the preview matches the exported result.")
     if metadata.get("has_alpha"):

@@ -23,14 +23,15 @@ import * as React from "react";
 
 import { useEditorStore, type EditorTool } from "@/store/editor-store";
 
-const TOOLS: Array<{ tool: EditorTool; label: string; icon: React.ElementType; shortcut: string }> = [
-  { tool: "brush", label: "Brush", icon: Brush, shortcut: "B" },
-  { tool: "eraser", label: "Eraser", icon: Eraser, shortcut: "E" },
-  { tool: "rect", label: "Rectangle selection", icon: Square, shortcut: "R" },
-  { tool: "lasso", label: "Lasso selection", icon: Lasso, shortcut: "L" },
-  { tool: "polygon", label: "Polygon selection", icon: Expand, shortcut: "P" },
-  { tool: "pan", label: "Pan", icon: Hand, shortcut: "H" },
-];
+const TOOLS: Array<{ tool: EditorTool; label: string; icon: React.ElementType; shortcut: string }> =
+  [
+    { tool: "brush", label: "Brush", icon: Brush, shortcut: "B" },
+    { tool: "eraser", label: "Eraser", icon: Eraser, shortcut: "E" },
+    { tool: "rect", label: "Rectangle selection", icon: Square, shortcut: "R" },
+    { tool: "lasso", label: "Lasso selection", icon: Lasso, shortcut: "L" },
+    { tool: "polygon", label: "Polygon selection", icon: Expand, shortcut: "P" },
+    { tool: "pan", label: "Pan", icon: Hand, shortcut: "H" },
+  ];
 
 export function EditorToolbar({
   onFitToScreen,
@@ -67,12 +68,24 @@ export function EditorToolbar({
       <span className="mx-1 h-6 w-px bg-[var(--color-line)]" aria-hidden="true" />
 
       <Tooltip label="Undo" shortcut="Ctrl+Z">
-        <Button variant="ghost" size="icon" aria-label="Undo" disabled={!store.canUndo()} onClick={store.undo}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Undo"
+          disabled={!store.canUndo()}
+          onClick={store.undo}
+        >
           <Undo2 aria-hidden="true" />
         </Button>
       </Tooltip>
       <Tooltip label="Redo" shortcut="Ctrl+Y">
-        <Button variant="ghost" size="icon" aria-label="Redo" disabled={!store.canRedo()} onClick={store.redo}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Redo"
+          disabled={!store.canRedo()}
+          onClick={store.redo}
+        >
           <Redo2 aria-hidden="true" />
         </Button>
       </Tooltip>
@@ -85,11 +98,16 @@ export function EditorToolbar({
       <span className="mx-1 h-6 w-px bg-[var(--color-line)]" aria-hidden="true" />
 
       <Tooltip label="Zoom out" shortcut="-">
-        <Button variant="ghost" size="icon" aria-label="Zoom out" onClick={() => store.zoomBy(1 / 1.2)}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Zoom out"
+          onClick={() => store.zoomBy(1 / 1.2)}
+        >
           <ZoomOut aria-hidden="true" />
         </Button>
       </Tooltip>
-      <span className="min-w-12 text-center text-xs tabular-nums text-[var(--color-ink-muted)]">
+      <span className="min-w-12 text-center text-xs text-[var(--color-ink-muted)] tabular-nums">
         {Math.round(store.zoom * 100)}%
       </span>
       <Tooltip label="Zoom in" shortcut="+">
@@ -125,7 +143,9 @@ export function EditorToolbar({
         <Button
           variant="ghost"
           size="icon"
-          aria-label={store.theme === "dark" ? "Switch to light workspace" : "Switch to dark workspace"}
+          aria-label={
+            store.theme === "dark" ? "Switch to light workspace" : "Switch to dark workspace"
+          }
           onClick={() => store.setTheme(store.theme === "dark" ? "light" : "dark")}
         >
           {store.theme === "dark" ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
@@ -229,7 +249,11 @@ export function ComparisonControls() {
           { value: "single", label: "Result only" },
           { value: "split", label: "Split view", description: "Original beside the result" },
           { value: "slider", label: "Before / after slider" },
-          { value: "difference", label: "Difference map", description: "Exactly which pixels changed" },
+          {
+            value: "difference",
+            label: "Difference map",
+            description: "Exactly which pixels changed",
+          },
         ]}
       />
       {comparison === "slider" ? (
@@ -248,7 +272,15 @@ export function ComparisonControls() {
   );
 }
 
-export function AutosaveIndicator({ saving, dirty, version }: { saving: boolean; dirty: boolean; version: number | null }) {
+export function AutosaveIndicator({
+  saving,
+  dirty,
+  version,
+}: {
+  saving: boolean;
+  dirty: boolean;
+  version: number | null;
+}) {
   const message = saving
     ? "Saving mask..."
     : dirty

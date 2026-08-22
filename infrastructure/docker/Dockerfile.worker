@@ -1,0 +1,18 @@
+# ---------------------------------------------------------------------------
+# ArtRestore Studio worker
+#
+# Shares the API image's base layer. Concurrency defaults to 2 because both
+# inpainting and video rendering are CPU-bound: oversubscribing makes every job
+# slower rather than more of them finish.
+# ---------------------------------------------------------------------------
+ARG BASE_IMAGE=artrestore-api:latest
+FROM ${BASE_IMAGE} AS worker
+
+WORKDIR /app
+
+ENV CELERY_CONCURRENCY=2
+
+HEALTHCHECK --interval=60s --timeout=15s --start-period=30s --retries=3 \
+    CMD celery -A artrestore_worker.celery_app:app inspect ping -d celery@$HOSTNAME || exit 1
+
+CMD ["sh", "-c", "celery -A artrestore_worker.celery_app:app worker --loglevel=info --concurrency=${CELERY_CONCURRENCY}"]

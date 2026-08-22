@@ -63,13 +63,17 @@ def create_job(
         return existing, False
 
     if not allow_concurrent:
-        running = db.execute(
-            select(ProcessingJob).where(
-                ProcessingJob.project_id == project.id,
-                ProcessingJob.job_type == job_type,
-                ProcessingJob.status.in_(("queued", "running")),
+        running = (
+            db.execute(
+                select(ProcessingJob).where(
+                    ProcessingJob.project_id == project.id,
+                    ProcessingJob.job_type == job_type,
+                    ProcessingJob.status.in_(("queued", "running")),
+                )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         if running is not None:
             raise conflict(
                 "job_in_progress",
@@ -122,7 +126,7 @@ def dispatch(job: ProcessingJob, task_name: str) -> None:
 
 def mark_running(db: Session, job: ProcessingJob) -> None:
     job.status = "running"
-    job.started_at = dt.datetime.now(dt.timezone.utc)
+    job.started_at = dt.datetime.now(dt.UTC)
     job.progress_message = "Starting"
     db.flush()
 
@@ -138,20 +142,22 @@ def mark_succeeded(db: Session, job: ProcessingJob, result: dict) -> None:
     job.progress = 1.0
     job.progress_message = "Complete"
     job.result = result
-    job.completed_at = dt.datetime.now(dt.timezone.utc)
+    job.completed_at = dt.datetime.now(dt.UTC)
     project = db.get(Project, job.project_id)
     if project is not None:
         project.status = "complete"
     db.flush()
 
 
-def mark_failed(db: Session, job: ProcessingJob, *, code: str, message: str, result: dict | None = None) -> None:
+def mark_failed(
+    db: Session, job: ProcessingJob, *, code: str, message: str, result: dict | None = None
+) -> None:
     job.status = "failed"
     job.error_code = code
     job.error_message = message[:2000]
     if result:
         job.result = result
-    job.completed_at = dt.datetime.now(dt.timezone.utc)
+    job.completed_at = dt.datetime.now(dt.UTC)
     project = db.get(Project, job.project_id)
     if project is not None:
         project.status = "failed"
@@ -161,7 +167,7 @@ def mark_failed(db: Session, job: ProcessingJob, *, code: str, message: str, res
 def mark_cancelled(db: Session, job: ProcessingJob) -> None:
     job.status = "cancelled"
     job.progress_message = "Cancelled"
-    job.completed_at = dt.datetime.now(dt.timezone.utc)
+    job.completed_at = dt.datetime.now(dt.UTC)
     project = db.get(Project, job.project_id)
     if project is not None:
         project.status = "ready"

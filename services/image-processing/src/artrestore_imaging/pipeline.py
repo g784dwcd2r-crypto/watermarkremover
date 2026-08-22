@@ -11,8 +11,8 @@ caller stores them under a new key.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 import cv2
 import numpy as np
@@ -57,7 +57,7 @@ class CleanupOptions:
     backend_settings: dict = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, data: dict | None) -> "CleanupOptions":
+    def from_dict(cls, data: dict | None) -> CleanupOptions:
         data = data or {}
         mode = str(data.get("mode", "fast_fill"))
         if mode not in CLEANUP_MODES:
@@ -294,7 +294,9 @@ def run_cleanup(
 
     emit(0.8, "Correcting edges and colour consistency")
     if options.edge_strength > 0 and mode in ("edge_aware", "art_mode", "texture_restore"):
-        filled = restoration.continue_edges(filled, raster.rgb, binary, strength=options.edge_strength)
+        filled = restoration.continue_edges(
+            filled, raster.rgb, binary, strength=options.edge_strength
+        )
     if options.colour_match:
         filled = restoration.match_local_colour(filled, raster.rgb, binary)
 
@@ -339,7 +341,9 @@ def _run_mode(
     """Dispatch to the per-mode reconstruction strategy."""
     backend_options = {"settings": options.backend_settings}
 
-    def make_request(image: np.ndarray, mask: np.ndarray, extra: dict | None = None) -> InpaintRequest:
+    def make_request(
+        image: np.ndarray, mask: np.ndarray, extra: dict | None = None
+    ) -> InpaintRequest:
         return InpaintRequest(
             rgb=image,
             mask=mask,
@@ -359,7 +363,9 @@ def _run_mode(
     # strongest, and the residual texture is synthesised from real neighbouring
     # pixels so brushwork and grain survive.
     sigma_space, sigma_color = (7.0, 30.0) if mode == "edge_aware" else (11.0, 55.0)
-    structure, texture = restoration.decompose(rgb, sigma_space=sigma_space, sigma_color=sigma_color)
+    structure, texture = restoration.decompose(
+        rgb, sigma_space=sigma_space, sigma_color=sigma_color
+    )
 
     progress(0.1, "Reconstructing structure layer")
     structure_backend = get_backend(

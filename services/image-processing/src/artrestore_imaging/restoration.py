@@ -39,7 +39,9 @@ def recombine(structure: np.ndarray, texture: np.ndarray) -> np.ndarray:
     return np.clip(combined, 0, 255).astype(np.uint8)
 
 
-def feather_composite(original: np.ndarray, filled: np.ndarray, soft_mask: np.ndarray) -> np.ndarray:
+def feather_composite(
+    original: np.ndarray, filled: np.ndarray, soft_mask: np.ndarray
+) -> np.ndarray:
     """Blend the reconstruction into the original using the feathered mask.
 
     Pixels outside the soft mask are returned bit-for-bit unchanged, so a

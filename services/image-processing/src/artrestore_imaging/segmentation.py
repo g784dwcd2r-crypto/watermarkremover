@@ -37,7 +37,7 @@ def model_available(settings: dict | None = None) -> bool:
         return False
     try:
         import onnxruntime  # noqa: F401
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
     return True
 
@@ -60,7 +60,13 @@ def segment_box(
 
     try:
         cv2.grabCut(
-            bgr, mask, (x, y, w, h), background_model, foreground_model, iterations, cv2.GC_INIT_WITH_RECT
+            bgr,
+            mask,
+            (x, y, w, h),
+            background_model,
+            foreground_model,
+            iterations,
+            cv2.GC_INIT_WITH_RECT,
         )
     except cv2.error:
         result = np.zeros((height, width), np.uint8)
@@ -135,4 +141,6 @@ def segment_text_overlay(rgb: np.ndarray, box: tuple[int, int, int, int]) -> Seg
     mask = np.zeros((height, width), np.uint8)
     mask[y : y + h, x : x + w] = binary
     coverage = float((binary > 0).mean())
-    return SegmentationResult(mask=mask, method="text_strokes", confidence=float(np.clip(coverage * 2, 0.1, 0.95)))
+    return SegmentationResult(
+        mask=mask, method="text_strokes", confidence=float(np.clip(coverage * 2, 0.1, 0.95))
+    )

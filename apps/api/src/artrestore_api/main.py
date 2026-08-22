@@ -10,12 +10,11 @@ import logging
 import time
 from contextlib import asynccontextmanager
 
+from artrestore_imaging.errors import ImagingError
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
-from artrestore_imaging.errors import ImagingError
 
 from .config import get_settings
 from .errors import APIError, api_error_handler

@@ -11,7 +11,6 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from starlette.concurrency import run_in_threadpool
 
-from ..config import get_settings
 from ..db import session_scope
 from ..deps import CSRFProtected, CurrentUser, DbSession, DefaultRateLimit, JobRateLimit
 from ..errors import not_found, validation_error

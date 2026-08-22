@@ -78,7 +78,10 @@ export default function LandingPage() {
       </section>
 
       <section aria-labelledby="demo-heading" className="mb-16">
-        <h2 id="demo-heading" className="font-serif text-2xl tracking-tight text-[var(--color-ink)]">
+        <h2
+          id="demo-heading"
+          className="font-serif text-2xl tracking-tight text-[var(--color-ink)]"
+        >
           A date stamp on a backdrop you shot yourself
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--color-ink-muted)]">

@@ -219,7 +219,8 @@ export function MaskCanvas({
       className={className}
       data-testid="mask-canvas"
       style={{
-        backgroundColor: theme === "dark" ? "var(--color-canvas-dark)" : "var(--color-canvas-light)",
+        backgroundColor:
+          theme === "dark" ? "var(--color-canvas-dark)" : "var(--color-canvas-light)",
         touchAction: "none",
       }}
     >
@@ -242,9 +243,7 @@ export function MaskCanvas({
           onTouchEnd={handlePointerUp}
           onWheel={handleWheel}
         >
-          <Layer listening={false}>
-            {image ? <KonvaImage image={image} x={0} y={0} /> : null}
-          </Layer>
+          <Layer listening={false}>{image ? <KonvaImage image={image} x={0} y={0} /> : null}</Layer>
 
           {showMask ? (
             <Layer listening={false} opacity={1} className="mask-overlay">

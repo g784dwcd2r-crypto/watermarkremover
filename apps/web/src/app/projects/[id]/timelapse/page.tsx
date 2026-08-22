@@ -28,7 +28,11 @@ import {
   RenderControls,
   type RenderSettings,
 } from "@/components/timelapse/render-controls";
-import { StageTimeline, toEditable, type EditableStage } from "@/components/timelapse/stage-timeline";
+import {
+  StageTimeline,
+  toEditable,
+  type EditableStage,
+} from "@/components/timelapse/stage-timeline";
 import { ApiError } from "@/lib/api";
 import {
   useAnalyzeArtwork,
@@ -72,7 +76,9 @@ export default function TimelapseEditorPage() {
   const sourcePreview = (assets.data ?? []).find((asset) => asset.type === "source_preview");
   const intermediates = (assets.data ?? []).filter((asset) => asset.type === "intermediate");
   const audioAssets = (assets.data ?? []).filter((asset) => asset.type === "audio");
-  const authenticCount = editable.filter((stage) => stage.stage_type === "real_intermediate").length;
+  const authenticCount = editable.filter(
+    (stage) => stage.stage_type === "real_intermediate",
+  ).length;
 
   const totalDuration = editable
     .filter((stage) => stage.enabled)
@@ -109,7 +115,9 @@ export default function TimelapseEditorPage() {
         },
         onError: (mutationError) =>
           setError(
-            mutationError instanceof ApiError ? mutationError.message : "The timeline is not valid.",
+            mutationError instanceof ApiError
+              ? mutationError.message
+              : "The timeline is not valid.",
           ),
       },
     );
@@ -132,7 +140,9 @@ export default function TimelapseEditorPage() {
         },
         onError: (mutationError) =>
           setError(
-            mutationError instanceof ApiError ? mutationError.message : "The render could not start.",
+            mutationError instanceof ApiError
+              ? mutationError.message
+              : "The render could not start.",
           ),
       },
     );
@@ -233,8 +243,8 @@ export default function TimelapseEditorPage() {
                   Analyse and build a timeline
                 </Button>
                 <p className="text-xs text-[var(--color-ink-muted)]">
-                  {TIMELAPSE_MODE_LABELS[mode]} produces a starting timeline you can then reorder and
-                  retime.
+                  {TIMELAPSE_MODE_LABELS[mode]} produces a starting timeline you can then reorder
+                  and retime.
                 </p>
               </div>
             </CardContent>

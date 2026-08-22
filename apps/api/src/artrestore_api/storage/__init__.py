@@ -10,8 +10,8 @@ from .base import (  # noqa: F401
     StorageError,
     build_object_key,
 )
-from .local import LocalStorage  # noqa: F401
-from .s3 import S3Storage  # noqa: F401
+from .local import LocalStorage
+from .s3 import S3Storage
 
 _storage: Storage | None = None
 

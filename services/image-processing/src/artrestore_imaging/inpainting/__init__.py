@@ -5,17 +5,19 @@ optional heavy dependencies. Model-backed adapters register too, but report
 themselves unavailable until an operator configures a local checkpoint.
 """
 
-from .base import (  # noqa: F401
+from . import (
+    diffusion_backend,  # noqa: F401
+    lama_backend,  # noqa: F401
+    opencv_backend,  # noqa: F401
+    patchmatch,  # noqa: F401
+)
+from .base import (
     InpaintBackend,
     InpaintRequest,
     available_backends,
     get_backend,
     register_backend,
 )
-from . import opencv_backend  # noqa: F401
-from . import patchmatch  # noqa: F401
-from . import lama_backend  # noqa: F401
-from . import diffusion_backend  # noqa: F401
 
 __all__ = [
     "InpaintBackend",

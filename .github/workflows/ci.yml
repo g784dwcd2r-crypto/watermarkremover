@@ -1,0 +1,162 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "22"
+
+jobs:
+  python-lint:
+    name: Python lint and format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install ruff==0.6.9 black==24.10.0
+      - name: Ruff
+        run: ruff check .
+      - name: Black
+        run: black --check .
+
+  python-tests:
+    name: Python tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install FFmpeg
+        # The video tests assert real codec output, so they need a real encoder.
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Install packages
+        run: |
+          pip install --upgrade pip
+          pip install -e ./services/image-processing \
+                      -e ./services/timelapse-renderer \
+                      -e ./apps/api \
+                      -e ./apps/worker
+          pip install pytest pytest-cov httpx httpx2
+      - name: Run tests
+        run: pytest --cov=artrestore_imaging --cov=artrestore_timelapse --cov=artrestore_api --cov-report=term-missing
+
+  migrations:
+    name: Alembic migrations
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: artrestore
+          POSTGRES_PASSWORD: artrestore
+          POSTGRES_DB: artrestore
+        options: >-
+          --health-cmd "pg_isready -U artrestore"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+        ports: ["5432:5432"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: |
+          pip install -e ./services/image-processing \
+                      -e ./services/timelapse-renderer \
+                      -e ./apps/api
+      - name: Upgrade, then downgrade
+        working-directory: apps/api
+        env:
+          ARS_DATABASE_URL: postgresql+psycopg://artrestore:artrestore@localhost:5432/artrestore
+        # A migration that cannot be reversed is a migration you cannot roll
+        # back, so both directions are exercised on the real engine.
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+
+  web:
+    name: Web lint, typecheck and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
+
+  e2e:
+    name: End-to-end
+    runs-on: ubuntu-latest
+    needs: [web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Install Python packages
+        run: |
+          pip install -e ./services/image-processing \
+                      -e ./services/timelapse-renderer \
+                      -e ./apps/api \
+                      -e ./apps/worker
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start the API
+        # SQLite, filesystem storage and in-process jobs: no extra services.
+        run: |
+          PYTHON=$(which python) ./scripts/dev-api.sh &
+          for _ in $(seq 1 60); do
+            curl -sf http://localhost:8000/healthz && break
+            sleep 1
+          done
+      - run: npm run build --workspace=@artrestore/web
+      - run: npm run test:e2e --workspace=@artrestore/web
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 7
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infrastructure/docker/Dockerfile.api
+          target: api
+          push: false
+          tags: artrestore-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

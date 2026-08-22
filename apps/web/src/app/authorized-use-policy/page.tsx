@@ -74,9 +74,9 @@ export default function AuthorizedUsePolicyPage() {
       <PolicySection heading="Ambiguous regions, and why you are asked">
         <p>
           Some shapes are genuinely ambiguous. A date stamp in a bottom corner has the same geometry
-          as a credit line, and a diagonally patterned artwork has some of the same signal as a tiled
-          watermark. Guessing in either direction would be wrong: refusing would break legitimate
-          work, and proceeding would risk erasing attribution.
+          as a credit line, and a diagonally patterned artwork has some of the same signal as a
+          tiled watermark. Guessing in either direction would be wrong: refusing would break
+          legitimate work, and proceeding would risk erasing attribution.
         </p>
         <p>
           So the app pauses and asks you to state explicitly that the region is not attribution
@@ -120,8 +120,8 @@ export default function AuthorizedUsePolicyPage() {
           These detectors are heuristics. They will sometimes flag a mark that is genuinely yours to
           remove, and they will sometimes miss a low-contrast signature. Where the shape is
           ambiguous you can attest and continue. Where it is a high-confidence refusal, contact
-          support with the details — the answer may be that the detector needs improving, and that is
-          a change to the software rather than an exception granted to an account.
+          support with the details — the answer may be that the detector needs improving, and that
+          is a change to the software rather than an exception granted to an account.
         </p>
         <p>
           See also the <Link href="/privacy">privacy policy</Link> and the{" "}

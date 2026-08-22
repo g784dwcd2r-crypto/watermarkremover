@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from artrestore_api.logging_setup import scrub, truncate_key
 
 

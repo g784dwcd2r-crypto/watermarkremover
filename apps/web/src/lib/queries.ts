@@ -8,12 +8,7 @@
 
 "use client";
 
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type UseQueryOptions,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from "@tanstack/react-query";
 import type {
   Asset,
   AssetAnalysis,
@@ -360,7 +355,8 @@ export function useJobs(projectId: string, jobType?: string) {
   const suffix = jobType ? `?job_type=${jobType}` : "";
   return useQuery<{ items: Job[]; total: number }>({
     queryKey: [...queryKeys.jobs(projectId), jobType ?? "all"],
-    queryFn: () => api.get<{ items: Job[]; total: number }>(`/v1/projects/${projectId}/jobs${suffix}`),
+    queryFn: () =>
+      api.get<{ items: Job[]; total: number }>(`/v1/projects/${projectId}/jobs${suffix}`),
     enabled: Boolean(projectId),
   });
 }

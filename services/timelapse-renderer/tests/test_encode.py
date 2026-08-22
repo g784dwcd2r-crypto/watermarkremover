@@ -7,11 +7,10 @@ import zipfile
 
 import numpy as np
 import pytest
-
 from artrestore_timelapse import (
-    AudioTrack,
     PROCESS_MARKER,
     RECONSTRUCTION_TYPE,
+    AudioTrack,
     RenderOptions,
     TimelapseRenderer,
     build_plan,
@@ -21,12 +20,12 @@ from artrestore_timelapse import (
     encode_gif,
     encode_video,
     encoder_report,
+    ffmpeg_available,
     probe,
     write_frame_archive,
     write_poster,
 )
 from artrestore_timelapse.errors import EncodingFailedError
-from artrestore_timelapse import ffmpeg_available
 
 requires_ffmpeg = pytest.mark.skipif(
     not ffmpeg_available(), reason="FFmpeg is not installed on this machine"
@@ -195,8 +194,9 @@ def test_same_seed_produces_byte_identical_video(analysis, tmp_path):
         renderer = TimelapseRenderer(
             analysis,
             build_plan("hand_drawn_strokes", total_seconds=5),
-            RenderOptions(fps=24, seed=1234, preview=True, preview_max_side=120,
-                          end_card_seconds=0.3),
+            RenderOptions(
+                fps=24, seed=1234, preview=True, preview_max_side=120, end_card_seconds=0.3
+            ),
         )
         encode_video(
             renderer.iter_frames(),
@@ -224,9 +224,7 @@ def test_frame_size_mismatch_is_rejected(tmp_path):
 
 def test_gif_preview_is_sampled_down(renderer, tmp_path):
     destination = tmp_path / "preview.gif"
-    result = encode_gif(
-        renderer.iter_frames(), destination, fps=8, max_width=160, source_fps=FPS
-    )
+    result = encode_gif(renderer.iter_frames(), destination, fps=8, max_width=160, source_fps=FPS)
     assert result.format == "gif"
     assert result.byte_size > 0
     assert result.width <= 160

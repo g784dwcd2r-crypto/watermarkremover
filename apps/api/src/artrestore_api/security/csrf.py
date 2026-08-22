@@ -31,8 +31,6 @@ def verify_csrf(request: Request, cookie_name: str) -> None:
     cookie_value = request.cookies.get(cookie_name)
     header_value = request.headers.get(CSRF_HEADER)
     if not cookie_value or not header_value:
-        raise CSRFError(
-            "This request needs a CSRF token. Reload the page and try again."
-        )
+        raise CSRFError("This request needs a CSRF token. Reload the page and try again.")
     if not constant_time_equals(cookie_value, header_value):
         raise CSRFError("The CSRF token did not match. Reload the page and try again.")

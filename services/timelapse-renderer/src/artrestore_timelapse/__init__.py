@@ -39,7 +39,8 @@ from .presets import (  # noqa: F401
     SUPPORTED_FPS,
     resolve_canvas,
 )
-from .project import build_project_json, dumps as dump_project_json  # noqa: F401
+from .project import build_project_json  # noqa: F401
+from .project import dumps as dump_project_json  # noqa: F401
 from .reveal import REVEAL_KINDS, apply_reveal, build_reveal_map  # noqa: F401
 from .stages import (  # noqa: F401
     MODE_LABELS,

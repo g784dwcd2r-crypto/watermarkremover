@@ -13,7 +13,8 @@ from contextlib import contextmanager
 from typing import Any
 
 from sqlalchemy import JSON, Engine, String, TypeDecorator, create_engine, event
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .config import get_settings

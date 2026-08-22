@@ -36,7 +36,7 @@ export function Progress({
     <div className={cn("flex flex-col gap-1.5", className)}>
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-sm font-medium text-[var(--color-ink)]">{label}</span>
-        <span className="text-xs tabular-nums text-[var(--color-ink-muted)]">{percent}%</span>
+        <span className="text-xs text-[var(--color-ink-muted)] tabular-nums">{percent}%</span>
       </div>
       <div
         role="progressbar"

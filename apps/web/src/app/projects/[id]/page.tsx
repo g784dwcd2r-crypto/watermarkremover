@@ -75,7 +75,9 @@ export default function ProjectPage() {
             </Button>
             <Button asChild disabled={sources.length === 0}>
               <Link href={editorHref}>
-                {detail.project_type === "cleanup" ? "Open the editor" : "Open the timelapse editor"}
+                {detail.project_type === "cleanup"
+                  ? "Open the editor"
+                  : "Open the timelapse editor"}
               </Link>
             </Button>
           </>
@@ -84,8 +86,8 @@ export default function ProjectPage() {
 
       {!detail.ownership_confirmed ? (
         <Alert tone="warning" title="Confirmation needed" className="mb-6">
-          Nothing can be processed until you confirm: &ldquo;{OWNERSHIP_STATEMENT}&rdquo; You do that
-          as part of the upload below.
+          Nothing can be processed until you confirm: &ldquo;{OWNERSHIP_STATEMENT}&rdquo; You do
+          that as part of the upload below.
         </Alert>
       ) : null}
 
@@ -130,9 +132,9 @@ export default function ProjectPage() {
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 <p className="text-sm leading-relaxed text-[var(--color-ink-muted)]">
-                  If you saved sketches or work-in-progress files, upload them here. Real Intermediate
-                  Frames uses them as actual keyframes in the order you upload, and only the
-                  transitions between them are generated.
+                  If you saved sketches or work-in-progress files, upload them here. Real
+                  Intermediate Frames uses them as actual keyframes in the order you upload, and
+                  only the transitions between them are generated.
                 </p>
                 <UploadDropzone
                   projectId={projectId}
@@ -161,7 +163,7 @@ export default function ProjectPage() {
                       <span className="truncate text-[var(--color-ink-muted)]">
                         {asset.type.replace(/_/g, " ")}
                       </span>
-                      <span className="shrink-0 tabular-nums text-[var(--color-ink-subtle)]">
+                      <span className="shrink-0 text-[var(--color-ink-subtle)] tabular-nums">
                         {formatBytes(asset.byte_size)}
                       </span>
                     </li>
@@ -195,7 +197,17 @@ export default function ProjectPage() {
   );
 }
 
-function SourceFacts({ asset }: { asset: { width: number | null; height: number | null; byte_size: number; mime_type: string; metadata: Record<string, unknown> } }) {
+function SourceFacts({
+  asset,
+}: {
+  asset: {
+    width: number | null;
+    height: number | null;
+    byte_size: number;
+    mime_type: string;
+    metadata: Record<string, unknown>;
+  };
+}) {
   const metadata = asset.metadata ?? {};
   const provenance = (metadata.provenance ?? {}) as Record<string, unknown>;
   const hasProvenance = Boolean(provenance.has_any);
@@ -225,7 +237,7 @@ function SourceFacts({ asset }: { asset: { width: number | null; height: number 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-[var(--color-ink-subtle)]">{label}</dt>
+      <dt className="text-xs tracking-wide text-[var(--color-ink-subtle)] uppercase">{label}</dt>
       <dd className="font-medium text-[var(--color-ink)]">{value}</dd>
     </div>
   );

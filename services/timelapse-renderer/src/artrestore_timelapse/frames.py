@@ -8,9 +8,8 @@ strokes. Everything is seeded, so the same project renders identically twice.
 
 from __future__ import annotations
 
-import math
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import cv2
 import numpy as np
@@ -102,7 +101,7 @@ class RenderPlan:
             "end_card_frames": self.end_card_frames,
             "stages": [
                 {**stage.to_dict(), "frames": frames}
-                for stage, frames in zip(self.stages, self.frame_counts)
+                for stage, frames in zip(self.stages, self.frame_counts, strict=True)
             ],
         }
 
@@ -154,9 +153,7 @@ class TimelapseRenderer:
 
         counts = [max(1, int(round(stage.duration * fps))) for stage in self.stages]
         end_card = (
-            max(1, int(round(options.end_card_seconds * fps)))
-            if options.end_card_disclosure
-            else 0
+            max(1, int(round(options.end_card_seconds * fps))) if options.end_card_disclosure else 0
         )
         return RenderPlan(
             stages=self.stages,
@@ -187,9 +184,9 @@ class TimelapseRenderer:
         alpha = np.clip(lines * strength, 0.0, 1.0)[:, :, None]
         ink = np.zeros_like(base, np.float32)
         ink[:, :] = (46, 44, 52)
-        return np.clip(
-            ink * alpha + base.astype(np.float32) * (1.0 - alpha), 0, 255
-        ).astype(np.uint8)
+        return np.clip(ink * alpha + base.astype(np.float32) * (1.0 - alpha), 0, 255).astype(
+            np.uint8
+        )
 
     def _sketch_jitter(self, shape: tuple[int, int], amount: float):
         height, width = shape
@@ -274,9 +271,9 @@ class TimelapseRenderer:
         )
         block = np.zeros_like(analysis.rgb, np.float32)
         block[:, :] = colour * 0.85
-        return np.clip(
-            block * mask + previous.astype(np.float32) * (1.0 - mask), 0, 255
-        ).astype(np.uint8)
+        return np.clip(block * mask + previous.astype(np.float32) * (1.0 - mask), 0, 255).astype(
+            np.uint8
+        )
 
     def _fit_to_analysis(self, image: np.ndarray) -> np.ndarray:
         height, width = self.analysis.rgb.shape[:2]
@@ -299,7 +296,7 @@ class TimelapseRenderer:
         total = self.plan.total_frames
 
         for stage_index, (stage, frame_count) in enumerate(
-            zip(self.plan.stages, self.plan.frame_counts)
+            zip(self.plan.stages, self.plan.frame_counts, strict=True)
         ):
             if should_cancel and should_cancel():
                 raise RenderCancelledError("The render was cancelled.")
@@ -426,9 +423,9 @@ class TimelapseRenderer:
         region = frame[y0:y1, x0:x1].astype(np.float32)
         overlay = rgb[: y1 - y0, : x1 - x0].astype(np.float32)
         alpha = alpha[: y1 - y0, : x1 - x0]
-        frame[y0:y1, x0:x1] = np.clip(
-            overlay * alpha + region * (1.0 - alpha), 0, 255
-        ).astype(np.uint8)
+        frame[y0:y1, x0:x1] = np.clip(overlay * alpha + region * (1.0 - alpha), 0, 255).astype(
+            np.uint8
+        )
         return frame
 
     def _draw_cursor(self, frame: np.ndarray, stroke_field, progress: float) -> np.ndarray:
@@ -463,9 +460,7 @@ class TimelapseRenderer:
         height, width = frame.shape[:2]
         band_height = max(48, int(height * 0.14))
         overlay = frame.copy()
-        cv2.rectangle(
-            overlay, (0, height - band_height), (width, height), (18, 18, 22), -1
-        )
+        cv2.rectangle(overlay, (0, height - band_height), (width, height), (18, 18, 22), -1)
         frame = cv2.addWeighted(overlay, 0.72 * fade, frame, 1.0 - 0.72 * fade, 0)
 
         scale = max(0.45, width / 1400.0)

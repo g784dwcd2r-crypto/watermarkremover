@@ -34,12 +34,12 @@ def readyz(db: DbSession) -> ReadinessOut:
     try:
         db.execute(text("SELECT 1"))
         checks["database"] = {"ok": True, "dialect": get_engine().dialect.name}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         checks["database"] = {"ok": False, "error": type(exc).__name__}
 
     try:
         checks["storage"] = get_storage().health()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         checks["storage"] = {"ok": False, "error": type(exc).__name__}
 
     limiter = get_rate_limiter()

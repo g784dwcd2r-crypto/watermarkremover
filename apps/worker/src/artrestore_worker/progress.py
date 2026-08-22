@@ -50,7 +50,7 @@ class ProgressReporter:
             job.progress = value
             job.progress_message = message[:256]
 
-    def stage(self, floor: float, ceiling: float) -> "ProgressReporter":
+    def stage(self, floor: float, ceiling: float) -> ProgressReporter:
         """A reporter that maps 0..1 onto a sub-range of the overall job."""
         child = ProgressReporter(self.job_id, floor=floor, ceiling=ceiling)
         return child

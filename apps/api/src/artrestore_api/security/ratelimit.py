@@ -45,7 +45,7 @@ class RateLimiter:
                 client.ping()
                 self._redis = client
                 self.backend = "redis"
-            except Exception:  # noqa: BLE001
+            except Exception:
                 self._redis = None
 
     def check(self, key: str, limit: int) -> RateLimitResult:
@@ -62,7 +62,7 @@ class RateLimiter:
                 pipeline.incr(bucket, 1)
                 pipeline.expire(bucket, self.window_seconds + 1)
                 count = int(pipeline.execute()[0])
-            except Exception:  # noqa: BLE001 - fall back rather than fail open loudly
+            except Exception:
                 count = self._increment_local(bucket)
         else:
             count = self._increment_local(bucket)

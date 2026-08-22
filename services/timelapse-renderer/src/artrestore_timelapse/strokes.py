@@ -122,12 +122,17 @@ def generate_strokes(
         start = (int(seeds_x[index]), int(seeds_y[index]))
         local_scale = float(analysis.scale_map[start[1], start[0]])
         # Broad passes make long fat marks; detail passes make short fine ones.
-        scale_factor = 1.0 - abs(weights["scale_bias"]) * abs(local_scale + weights["scale_bias"] / 2)
+        scale_factor = 1.0 - abs(weights["scale_bias"]) * abs(
+            local_scale + weights["scale_bias"] / 2
+        )
         scale_factor = float(np.clip(scale_factor, 0.2, 1.0))
 
         stroke_width = float(
-            np.clip(brush_min + (brush_max - brush_min) * scale_factor * rng.uniform(0.4, 1.0),
-                    brush_min, brush_max)
+            np.clip(
+                brush_min + (brush_max - brush_min) * scale_factor * rng.uniform(0.4, 1.0),
+                brush_min,
+                brush_max,
+            )
         )
         step_count = int(np.clip(diagonal * 0.03 * scale_factor * rng.uniform(0.6, 1.8), 4, 90))
         points = _walk(analysis.orientation, start, step_count, rng, width, height)

@@ -30,24 +30,24 @@ export function Tooltip({
   return (
     <TooltipPrimitive.Provider delayDuration={250}>
       <TooltipPrimitive.Root>
-      <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
-      <TooltipPrimitive.Portal>
-        <TooltipPrimitive.Content
-          side={side}
-          sideOffset={6}
-          className={cn(
-            "z-50 flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-ink)] px-2.5 py-1.5 text-xs text-[var(--color-paper)] shadow-md",
-          )}
-        >
-          {label}
-          {shortcut ? (
-            <kbd className="rounded border border-white/25 px-1 font-mono text-[10px] uppercase">
-              {shortcut}
-            </kbd>
-          ) : null}
-          <TooltipPrimitive.Arrow className="fill-[var(--color-ink)]" />
-        </TooltipPrimitive.Content>
-      </TooltipPrimitive.Portal>
+        <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
+        <TooltipPrimitive.Portal>
+          <TooltipPrimitive.Content
+            side={side}
+            sideOffset={6}
+            className={cn(
+              "z-50 flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-ink)] px-2.5 py-1.5 text-xs text-[var(--color-paper)] shadow-md",
+            )}
+          >
+            {label}
+            {shortcut ? (
+              <kbd className="rounded border border-white/25 px-1 font-mono text-[10px] uppercase">
+                {shortcut}
+              </kbd>
+            ) : null}
+            <TooltipPrimitive.Arrow className="fill-[var(--color-ink)]" />
+          </TooltipPrimitive.Content>
+        </TooltipPrimitive.Portal>
       </TooltipPrimitive.Root>
     </TooltipPrimitive.Provider>
   );

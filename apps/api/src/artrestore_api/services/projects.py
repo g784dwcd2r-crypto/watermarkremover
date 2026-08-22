@@ -26,7 +26,7 @@ def get_owned_project(db: Session, project_id: str, user: User) -> Project:
 
 
 def compute_delete_after(retention_days: int) -> dt.datetime:
-    return dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=retention_days)
+    return dt.datetime.now(dt.UTC) + dt.timedelta(days=retention_days)
 
 
 def create_project(

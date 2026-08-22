@@ -36,9 +36,7 @@ def get_account(user: CurrentUser) -> UserOut:
     dependencies=[CSRFProtected, DefaultRateLimit],
     summary="Update account settings",
 )
-def update_account(
-    payload: UpdateAccountRequest, user: CurrentUser, db: DbSession
-) -> UserOut:
+def update_account(payload: UpdateAccountRequest, user: CurrentUser, db: DbSession) -> UserOut:
     """Change the display name or the retention window.
 
     Changing retention re-dates every existing project, so shortening it takes
@@ -94,9 +92,10 @@ def delete_account(
     from ..config import get_settings
     from ..routers.auth import _clear_auth_cookies
 
-    if user.password_hash:
-        if not payload.password or not verify_password(payload.password, user.password_hash):
-            raise forbidden("Confirm your password to delete the account.")
+    if user.password_hash and not (
+        payload.password and verify_password(payload.password, user.password_hash)
+    ):
+        raise forbidden("Confirm your password to delete the account.")
 
     summary = retention_service.delete_account(db, user, storage)
     db.commit()

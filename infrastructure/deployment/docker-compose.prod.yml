@@ -1,0 +1,92 @@
+# ---------------------------------------------------------------------------
+# Production-shaped Compose file.
+#
+# Differences from the development stack that matter:
+#   - no MinIO: point ARS_S3_* at real object storage
+#   - no bind mounts and no exposed database ports
+#   - migrations run as a separate one-shot service before the API starts
+#   - exactly one beat replica
+#
+# Read docs/architecture/deployment.md first. TLS is terminated by the proxy in
+# front of this stack, not here.
+# ---------------------------------------------------------------------------
+name: artrestore-prod
+
+x-python-env: &python-env
+  ARS_ENVIRONMENT: production
+  ARS_DEBUG: "false"
+  ARS_COOKIE_SECURE: "true"
+  ARS_SECRET_KEY: ${ARS_SECRET_KEY:?set a generated secret key}
+  ARS_DATABASE_URL: ${ARS_DATABASE_URL:?set the database URL}
+  ARS_REDIS_URL: ${ARS_REDIS_URL:?set the redis URL}
+  ARS_CELERY_BROKER_URL: ${ARS_CELERY_BROKER_URL:?set the broker URL}
+  ARS_CELERY_RESULT_BACKEND: ${ARS_CELERY_RESULT_BACKEND:?set the result backend}
+  ARS_STORAGE_BACKEND: s3
+  ARS_S3_BUCKET: ${ARS_S3_BUCKET:?set the bucket}
+  ARS_S3_REGION: ${ARS_S3_REGION:-us-east-1}
+  ARS_S3_ENDPOINT_URL: ${ARS_S3_ENDPOINT_URL:-}
+  ARS_S3_ACCESS_KEY_ID: ${ARS_S3_ACCESS_KEY_ID:?set the access key}
+  ARS_S3_SECRET_ACCESS_KEY: ${ARS_S3_SECRET_ACCESS_KEY:?set the secret key}
+  ARS_PUBLIC_API_URL: ${ARS_PUBLIC_API_URL:?set the public API URL}
+  ARS_PUBLIC_WEB_URL: ${ARS_PUBLIC_WEB_URL:?set the public web URL}
+  ARS_CORS_ORIGINS: ${ARS_PUBLIC_WEB_URL}
+  ARS_COOKIE_DOMAIN: ${ARS_COOKIE_DOMAIN:-}
+  ARS_ERROR_TRACKING_DSN: ${ARS_ERROR_TRACKING_DSN:-}
+  ARS_LOG_LEVEL: ${ARS_LOG_LEVEL:-INFO}
+
+services:
+  migrate:
+    image: ${API_IMAGE:-artrestore-api:latest}
+    environment: *python-env
+    working_dir: /app/apps/api
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
+  api:
+    image: ${API_IMAGE:-artrestore-api:latest}
+    environment: *python-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    expose: ["8000"]
+    deploy:
+      replicas: ${API_REPLICAS:-2}
+      resources:
+        limits: { memory: 1g }
+    restart: unless-stopped
+
+  worker:
+    image: ${WORKER_IMAGE:-artrestore-worker:latest}
+    environment:
+      <<: *python-env
+      CELERY_CONCURRENCY: ${CELERY_CONCURRENCY:-2}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    deploy:
+      replicas: ${WORKER_REPLICAS:-2}
+      resources:
+        # Inpainting and rendering are memory-hungry on large canvases; keep
+        # this above ARS_MAX_IMAGE_PIXELS x 4 bytes x a working-set multiple.
+        limits: { memory: 3g }
+    restart: unless-stopped
+
+  beat:
+    image: ${WORKER_IMAGE:-artrestore-worker:latest}
+    environment: *python-env
+    depends_on:
+      worker: { condition: service_started }
+    # Exactly one. Two would run the retention sweep twice.
+    deploy:
+      replicas: 1
+    command: ["celery", "-A", "artrestore_worker.celery_app:app", "beat", "--loglevel=info"]
+    restart: unless-stopped
+
+  web:
+    image: ${WEB_IMAGE:-artrestore-web:latest}
+    expose: ["3000"]
+    depends_on:
+      api: { condition: service_started }
+    deploy:
+      replicas: ${WEB_REPLICAS:-2}
+      resources:
+        limits: { memory: 512m }
+    restart: unless-stopped

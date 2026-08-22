@@ -65,17 +65,29 @@ def build(max_width: int) -> dict[str, bytes]:
         "backdrop-clean.jpg": _encode(gradient, None, "backdrop-clean.jpg", max_width),
         "backdrop-datestamp.jpg": _encode(stamped, None, "backdrop-datestamp.jpg", max_width),
         "backdrop-datestamp-mask.png": _encode(
-            cv2.cvtColor(stamp_mask, cv2.COLOR_GRAY2RGB), None, "backdrop-datestamp-mask.png", max_width
+            cv2.cvtColor(stamp_mask, cv2.COLOR_GRAY2RGB),
+            None,
+            "backdrop-datestamp-mask.png",
+            max_width,
         ),
         "canvas-texture-clean.jpg": _encode(texture, None, "canvas-texture-clean.jpg", max_width),
         "canvas-texture-badge.jpg": _encode(badged, None, "canvas-texture-badge.jpg", max_width),
         "canvas-texture-badge-mask.png": _encode(
-            cv2.cvtColor(badge_mask, cv2.COLOR_GRAY2RGB), None, "canvas-texture-badge-mask.png", max_width
+            cv2.cvtColor(badge_mask, cv2.COLOR_GRAY2RGB),
+            None,
+            "canvas-texture-badge-mask.png",
+            max_width,
         ),
         "painted-landscape.jpg": _encode(painting, None, "painted-landscape.jpg", max_width),
-        "painted-landscape-signed.jpg": _encode(signed, None, "painted-landscape-signed.jpg", max_width),
-        "painted-landscape-credit.jpg": _encode(credited, None, "painted-landscape-credit.jpg", max_width),
-        "painted-landscape-stock.jpg": _encode(stock, None, "painted-landscape-stock.jpg", max_width),
+        "painted-landscape-signed.jpg": _encode(
+            signed, None, "painted-landscape-signed.jpg", max_width
+        ),
+        "painted-landscape-credit.jpg": _encode(
+            credited, None, "painted-landscape-credit.jpg", max_width
+        ),
+        "painted-landscape-stock.jpg": _encode(
+            stock, None, "painted-landscape-stock.jpg", max_width
+        ),
         "line-artwork.jpg": _encode(lines, None, "line-artwork.jpg", max_width),
         "alpha-sticker.png": _encode(sticker_rgb, sticker_alpha, "alpha-sticker.png", max_width),
     }
@@ -90,7 +102,8 @@ def build(max_width: int) -> dict[str, bytes]:
         },
         "files": sorted(files),
     }
-    files["manifest.json"] = json.dumps(manifest, indent=2).encode()
+    # Trailing newline so the generated file matches Prettier's output.
+    files["manifest.json"] = (json.dumps(manifest, indent=2) + "\n").encode()
     return files
 
 

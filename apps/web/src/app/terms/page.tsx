@@ -55,7 +55,8 @@ export default function TermsPage() {
         <ul className="flex flex-col gap-1.5">
           <li>You are responsible for keeping your credentials secure.</li>
           <li>
-            An operator may suspend an account that is being used to strip attribution or provenance.
+            An operator may suspend an account that is being used to strip attribution or
+            provenance.
           </li>
           <li>You may delete your account at any time; deletion is immediate and irreversible.</li>
         </ul>
@@ -64,8 +65,8 @@ export default function TermsPage() {
       <PolicySection heading="Content and ownership">
         <p>
           You retain all rights in what you upload and in what you export. The operator claims no
-          licence over your images beyond what is required to store and process them at your request,
-          and does not use them to train models.
+          licence over your images beyond what is required to store and process them at your
+          request, and does not use them to train models.
         </p>
       </PolicySection>
 

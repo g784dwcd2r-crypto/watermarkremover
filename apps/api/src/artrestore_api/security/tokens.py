@@ -27,11 +27,11 @@ def constant_time_equals(left: str, right: str) -> bool:
 
 
 def expiry(seconds: int) -> dt.datetime:
-    return dt.datetime.now(dt.timezone.utc) + dt.timedelta(seconds=seconds)
+    return dt.datetime.now(dt.UTC) + dt.timedelta(seconds=seconds)
 
 
 def utcnow() -> dt.datetime:
-    return dt.datetime.now(dt.timezone.utc)
+    return dt.datetime.now(dt.UTC)
 
 
 def as_utc(value: dt.datetime | None) -> dt.datetime | None:
@@ -39,8 +39,8 @@ def as_utc(value: dt.datetime | None) -> dt.datetime | None:
     if value is None:
         return None
     if value.tzinfo is None:
-        return value.replace(tzinfo=dt.timezone.utc)
-    return value.astimezone(dt.timezone.utc)
+        return value.replace(tzinfo=dt.UTC)
+    return value.astimezone(dt.UTC)
 
 
 def sign_payload(secret: str, payload: str) -> str:

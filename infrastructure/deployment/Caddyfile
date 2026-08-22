@@ -1,0 +1,49 @@
+# Reverse proxy for ArtRestore Studio.
+#
+# Both hosts must share a registrable domain so the session cookie stays
+# first-party. Caddy obtains and renews certificates automatically.
+#
+#   caddy run --config infrastructure/deployment/Caddyfile
+
+{$ARS_WEB_HOST:app.example.com} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	reverse_proxy web:3000
+}
+
+{$ARS_API_HOST:api.example.com} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# Server-Sent Events must not be buffered or the progress stream stalls
+	# until the job finishes.
+	@sse path_regexp sse ^/v1/projects/[^/]+/jobs/[^/]+/events$
+	reverse_proxy @sse api:8000 {
+		flush_interval -1
+		transport http {
+			response_header_timeout 0
+		}
+	}
+
+	# Uploads go straight to object storage, so this only carries JSON.
+	request_body {
+		max_size 2MB
+	}
+
+	reverse_proxy api:8000
+}

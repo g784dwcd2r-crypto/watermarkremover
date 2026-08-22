@@ -5,7 +5,6 @@ from __future__ import annotations
 import cv2
 import numpy as np
 import pytest
-
 from artrestore_imaging.errors import MaskError
 from artrestore_imaging.masks import (
     MaskAdjustments,

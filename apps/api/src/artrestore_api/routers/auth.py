@@ -7,10 +7,9 @@ token. Sign-in and sign-out always rotate both.
 
 from __future__ import annotations
 
-import datetime as dt
 import logging
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Request, Response, status
 from sqlalchemy import select
 
 from ..config import get_settings
@@ -74,9 +73,7 @@ def _start_session(db, response: Response, user: User) -> SessionOut:
     token = generate_token()
     csrf_token = issue_csrf_token()
     expires_at = expiry(settings.session_ttl_seconds)
-    db.add(
-        UserSession(user_id=user.id, token_hash=hash_token(token), expires_at=expires_at)
-    )
+    db.add(UserSession(user_id=user.id, token_hash=hash_token(token), expires_at=expires_at))
     db.commit()
     _set_auth_cookies(response, session_token=token, csrf_token=csrf_token)
     return SessionOut(
@@ -280,9 +277,7 @@ def request_magic_link(payload: MagicLinkRequest, db: DbSession) -> dict:
     dependencies=[AuthRateLimit],
     summary="Sign in with a passwordless link",
 )
-def confirm_magic_link(
-    payload: MagicLinkConfirm, response: Response, db: DbSession
-) -> SessionOut:
+def confirm_magic_link(payload: MagicLinkConfirm, response: Response, db: DbSession) -> SessionOut:
     record = db.execute(
         select(EmailToken).where(
             EmailToken.token_hash == hash_token(payload.token),

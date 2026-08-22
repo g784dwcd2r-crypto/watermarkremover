@@ -5,7 +5,8 @@ import { PolicyPage, PolicySection } from "@/components/layout/policy-page";
 
 export const metadata: Metadata = {
   title: "Privacy policy",
-  description: "What ArtRestore Studio stores, for how long, and what it never does with your images.",
+  description:
+    "What ArtRestore Studio stores, for how long, and what it never does with your images.",
 };
 
 export default function PrivacyPage() {
@@ -18,11 +19,13 @@ export default function PrivacyPage() {
     >
       <PolicySection heading="Your images are yours">
         <ul className="flex flex-col gap-1.5">
-          <li>Uploads are private to your account by default. There is no public sharing feature.</li>
+          <li>
+            Uploads are private to your account by default. There is no public sharing feature.
+          </li>
           <li>
             <strong>Your images are never used to train models.</strong> The inpainting and
-            segmentation models this deployment uses are deployed by the operator; nothing you upload
-            is added to a training set.
+            segmentation models this deployment uses are deployed by the operator; nothing you
+            upload is added to a training set.
           </li>
           <li>Images are not sent to third-party services for processing.</li>
         </ul>
@@ -37,9 +40,7 @@ export default function PrivacyPage() {
             Changing the setting re-dates work you have already uploaded, so shortening it takes
             effect on existing projects rather than only on new ones.
           </li>
-          <li>
-            Deleting a project removes its stored objects immediately, not on a later sweep.
-          </li>
+          <li>Deleting a project removes its stored objects immediately, not on a later sweep.</li>
           <li>
             Deleting your account erases every project, file, export and consent record it holds.
           </li>
@@ -49,7 +50,9 @@ export default function PrivacyPage() {
       <PolicySection heading="How files are accessed">
         <ul className="flex flex-col gap-1.5">
           <li>Uploads and downloads use short-lived signed URLs, minted on demand.</li>
-          <li>Transport is encrypted, and object storage is configured for server-side encryption.</li>
+          <li>
+            Transport is encrypted, and object storage is configured for server-side encryption.
+          </li>
           <li>
             Signed URLs are never written to application logs. Storage keys appear in logs only as a
             truncated prefix, never in a form that could be reconstructed into a link.
@@ -79,12 +82,12 @@ export default function PrivacyPage() {
             replayed as a login. No IP address or user-agent string is retained with a session.
           </li>
           <li>
-            Consent records: what you confirmed, when, and under which policy version. These exist so
-            the authorization trail is real rather than assumed.
+            Consent records: what you confirmed, when, and under which policy version. These exist
+            so the authorization trail is real rather than assumed.
           </li>
           <li>
-            Project, asset, mask, job and export records. Asset rows store descriptions — dimensions,
-            colour mode, whether provenance metadata is present — never image bytes.
+            Project, asset, mask, job and export records. Asset rows store descriptions —
+            dimensions, colour mode, whether provenance metadata is present — never image bytes.
           </li>
         </ul>
       </PolicySection>

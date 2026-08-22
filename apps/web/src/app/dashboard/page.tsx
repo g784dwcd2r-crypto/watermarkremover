@@ -157,8 +157,8 @@ export default function DashboardPage() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-[var(--color-ink-subtle)]">{label}</dt>
-      <dd className="text-lg font-semibold tabular-nums text-[var(--color-ink)]">{value}</dd>
+      <dt className="text-xs tracking-wide text-[var(--color-ink-subtle)] uppercase">{label}</dt>
+      <dd className="text-lg font-semibold text-[var(--color-ink)] tabular-nums">{value}</dd>
     </div>
   );
 }

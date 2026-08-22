@@ -1,14 +1,7 @@
 export { Alert, type AlertTone } from "./alert";
 export { Badge, type BadgeProps } from "./badge";
 export { Button, buttonVariants, type ButtonProps } from "./button";
-export {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "./card";
+export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./card";
 export { Checkbox, ConsentCheckbox } from "./checkbox";
 export { Dialog, DialogClose, DialogContent, DialogTrigger } from "./dialog";
 export { EmptyState, LiveRegion, Skeleton, VisuallyHidden } from "./feedback";

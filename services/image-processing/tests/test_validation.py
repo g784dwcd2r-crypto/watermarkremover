@@ -6,8 +6,6 @@ import io
 
 import numpy as np
 import pytest
-from PIL import Image
-
 from artrestore_imaging.errors import (
     CorruptImageError,
     ImageTooLargeError,
@@ -18,6 +16,7 @@ from artrestore_imaging.validation import (
     sniff_mime,
     validate_image_bytes,
 )
+from PIL import Image
 
 
 def test_accepts_png(flat_background, png_bytes):

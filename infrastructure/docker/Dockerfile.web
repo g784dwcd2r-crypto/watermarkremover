@@ -1,0 +1,48 @@
+# ---------------------------------------------------------------------------
+# ArtRestore Studio web
+#
+# NEXT_PUBLIC_* values are inlined at build time, so the API URL is a build
+# argument rather than a runtime environment variable.
+# ---------------------------------------------------------------------------
+FROM node:22-bookworm-slim AS deps
+
+WORKDIR /repo
+COPY package.json package-lock.json ./
+COPY apps/web/package.json apps/web/package.json
+COPY packages/config/package.json packages/config/package.json
+COPY packages/types/package.json packages/types/package.json
+COPY packages/ui/package.json packages/ui/package.json
+RUN npm ci --ignore-scripts
+
+# ---------------------------------------------------------------------------
+FROM deps AS build
+
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ARG NEXT_PUBLIC_APP_NAME="ArtRestore Studio"
+ARG NEXT_PUBLIC_MAX_UPLOAD_BYTES=41943040
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
+    NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME} \
+    NEXT_PUBLIC_MAX_UPLOAD_BYTES=${NEXT_PUBLIC_MAX_UPLOAD_BYTES} \
+    NEXT_TELEMETRY_DISABLED=1
+
+COPY . .
+RUN npm run build --workspace=@artrestore/web
+
+# ---------------------------------------------------------------------------
+FROM node:22-bookworm-slim AS runtime
+
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000
+
+WORKDIR /repo
+COPY --from=build /repo /repo
+
+RUN useradd --create-home --uid 10002 artrestore && chown -R artrestore:artrestore /repo
+USER artrestore
+
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD node -e "fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+CMD ["npm", "run", "start", "--workspace=@artrestore/web"]

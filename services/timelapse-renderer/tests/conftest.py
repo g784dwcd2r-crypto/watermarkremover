@@ -8,9 +8,9 @@ import wave
 
 import numpy as np
 import pytest
-
 from artrestore_imaging import demo
 from artrestore_timelapse import analyse_artwork
+
 
 @pytest.fixture(scope="session")
 def artwork() -> np.ndarray:

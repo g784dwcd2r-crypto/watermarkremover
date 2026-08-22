@@ -99,11 +99,15 @@ def detect_provenance(data: bytes) -> ProvenanceReport:
             for tag_id, value in exif.items():
                 name = TAGS.get(tag_id, str(tag_id))
                 if name in RIGHTS_EXIF_TAGS and value:
-                    text = value.decode("utf-16-le", "ignore") if isinstance(value, bytes) else str(value)
+                    text = (
+                        value.decode("utf-16-le", "ignore")
+                        if isinstance(value, bytes)
+                        else str(value)
+                    )
                     text = text.replace("\x00", "").strip()
                     if text:
                         report.exif_rights[name] = text
-    except Exception:  # noqa: BLE001 - metadata is best-effort, never fatal
+    except Exception:
         report.notes.append("EXIF block could not be parsed; it is copied through verbatim.")
 
     return report
@@ -126,7 +130,7 @@ def extract_preserved_metadata(data: bytes) -> dict:
                 preserved["dpi"] = info["dpi"]
             if info.get("photoshop"):
                 preserved["photoshop"] = info["photoshop"]
-    except Exception:  # noqa: BLE001
+    except Exception:
         return preserved
     return preserved
 
@@ -137,7 +141,7 @@ def exif_orientation(data: bytes) -> int:
         with Image.open(io.BytesIO(data)) as image:
             exif = image.getexif()
             return int(exif.get(0x0112, 1) or 1)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return 1
 
 

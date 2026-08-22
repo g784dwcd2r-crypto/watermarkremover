@@ -63,11 +63,16 @@ export default function AccountPage() {
   const storedRetention = user.retention_preferences?.retention_days;
   const retention: "1" | "7" | "30" =
     retentionDraft ??
-    (storedRetention === 1 || storedRetention === 30 ? (String(storedRetention) as "1" | "30") : "7");
+    (storedRetention === 1 || storedRetention === 30
+      ? (String(storedRetention) as "1" | "30")
+      : "7");
 
   return (
     <AppShell>
-      <PageHeader title="Account" description="Your details, your storage, and what you have agreed to." />
+      <PageHeader
+        title="Account"
+        description="Your details, your storage, and what you have agreed to."
+      />
 
       {notice ? (
         <Alert tone="success" live className="mb-4">
@@ -105,11 +110,19 @@ export default function AccountPage() {
                 );
               }}
             >
-              <Field label="Email" htmlFor="account-email" description="Contact support to change your email.">
+              <Field
+                label="Email"
+                htmlFor="account-email"
+                description="Contact support to change your email."
+              >
                 <Input id="account-email" value={user.email} readOnly disabled />
               </Field>
               <Field label="Name" htmlFor="account-name">
-                <Input id="account-name" value={name} onChange={(event) => setNameDraft(event.target.value)} />
+                <Input
+                  id="account-name"
+                  value={name}
+                  onChange={(event) => setNameDraft(event.target.value)}
+                />
               </Field>
               <Button type="submit" loading={update.isPending} className="self-start">
                 Save
@@ -154,8 +167,8 @@ export default function AccountPage() {
             />
             <p className="text-sm leading-relaxed text-[var(--color-ink-muted)]">
               Your images are private to your account and are never used to train models. Download
-              links are signed and expire within minutes. You can delete any project immediately from
-              the dashboard.
+              links are signed and expire within minutes. You can delete any project immediately
+              from the dashboard.
             </p>
             <Button asChild variant="secondary" size="sm" className="self-start">
               <a href={`${API_BASE_URL}/v1/account/export`} target="_blank" rel="noreferrer">
@@ -173,21 +186,29 @@ export default function AccountPage() {
             <CardContent>
               <dl className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-[var(--color-ink-subtle)]">Used</dt>
+                  <dt className="text-xs tracking-wide text-[var(--color-ink-subtle)] uppercase">
+                    Used
+                  </dt>
                   <dd className="text-lg font-semibold tabular-nums">
                     {formatBytes(usage.data.total_bytes)}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-[var(--color-ink-subtle)]">Projects</dt>
+                  <dt className="text-xs tracking-wide text-[var(--color-ink-subtle)] uppercase">
+                    Projects
+                  </dt>
                   <dd className="text-lg font-semibold tabular-nums">{usage.data.project_count}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-[var(--color-ink-subtle)]">Files</dt>
+                  <dt className="text-xs tracking-wide text-[var(--color-ink-subtle)] uppercase">
+                    Files
+                  </dt>
                   <dd className="text-lg font-semibold tabular-nums">{usage.data.asset_count}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-[var(--color-ink-subtle)]">Exports</dt>
+                  <dt className="text-xs tracking-wide text-[var(--color-ink-subtle)] uppercase">
+                    Exports
+                  </dt>
                   <dd className="text-lg font-semibold tabular-nums">
                     {formatBytes(usage.data.export_bytes)}
                   </dd>
@@ -207,7 +228,10 @@ export default function AccountPage() {
             ) : (
               <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto text-sm">
                 {(consents.data ?? []).map((record) => (
-                  <li key={record.id} className="border-b border-[var(--color-line)] pb-2 last:border-0">
+                  <li
+                    key={record.id}
+                    className="border-b border-[var(--color-line)] pb-2 last:border-0"
+                  >
                     <p className="font-medium text-[var(--color-ink)]">
                       {record.statement || record.consent_type}
                     </p>
@@ -221,14 +245,14 @@ export default function AccountPage() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2 border-[var(--color-danger)]/30">
+        <Card className="border-[var(--color-danger)]/30 lg:col-span-2">
           <CardHeader>
             <CardTitle>Delete this account</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <p className="text-sm leading-relaxed text-[var(--color-ink-muted)]">
-              Deleting removes every project, every uploaded file and every export from storage, plus
-              your consent history. It is immediate and cannot be undone.
+              Deleting removes every project, every uploaded file and every export from storage,
+              plus your consent history. It is immediate and cannot be undone.
             </p>
             <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
               <DialogTrigger asChild>

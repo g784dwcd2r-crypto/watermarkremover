@@ -67,14 +67,18 @@ def woven_texture(width: int = 800, height: int = 600, seed: int | None = None) 
     warp = np.sin(xs * math.pi / 6.0) * 10.0
     weft = np.sin(ys * math.pi / 6.0 + 1.2) * 10.0
     weave = 168.0 + warp + weft
-    slub = cv2.GaussianBlur(rng.normal(0.0, 9.0, size=(height, width)).astype(np.float32), (0, 0), 2.0)
+    slub = cv2.GaussianBlur(
+        rng.normal(0.0, 9.0, size=(height, width)).astype(np.float32), (0, 0), 2.0
+    )
     fibres = rng.normal(0.0, 3.5, size=(height, width)).astype(np.float32)
     luminance = np.clip(weave + slub + fibres, 0, 255)
     tint = np.stack([luminance * 1.02, luminance * 0.98, luminance * 0.88], axis=-1)
     return np.clip(tint, 0, 255).astype(np.uint8)
 
 
-def painted_illustration(width: int = 900, height: int = 640, seed: int | None = None) -> np.ndarray:
+def painted_illustration(
+    width: int = 900, height: int = 640, seed: int | None = None
+) -> np.ndarray:
     """A procedurally painted landscape with visible brushwork and paper grain."""
     rng = _rng(seed)
     canvas = np.zeros((height, width, 3), np.float32)
@@ -109,14 +113,20 @@ def painted_illustration(width: int = 900, height: int = 640, seed: int | None =
         dx, dy = int(math.cos(angle) * length), int(math.sin(angle) * length)
         shade = rng.normal(0, 13, size=3)
         colour = np.clip(canvas[y, x] + shade, 0, 255)
-        cv2.line(canvas, (x, y), (x + dx, y + dy), colour.tolist(), int(rng.integers(1, 4)), cv2.LINE_AA)
+        cv2.line(
+            canvas, (x, y), (x + dx, y + dy), colour.tolist(), int(rng.integers(1, 4)), cv2.LINE_AA
+        )
 
     # A warm sun disc and its glow.
-    cv2.circle(canvas, (int(width * 0.72), int(height * 0.22)), 46, (255, 226, 172), -1, cv2.LINE_AA)
+    cv2.circle(
+        canvas, (int(width * 0.72), int(height * 0.22)), 46, (255, 226, 172), -1, cv2.LINE_AA
+    )
     canvas = cv2.GaussianBlur(canvas, (0, 0), 0.7)
 
     # Paper grain.
-    grain = cv2.GaussianBlur(rng.normal(0, 5.5, size=(height, width)).astype(np.float32), (0, 0), 0.6)
+    grain = cv2.GaussianBlur(
+        rng.normal(0, 5.5, size=(height, width)).astype(np.float32), (0, 0), 0.6
+    )
     canvas += grain[:, :, None]
     return np.clip(canvas, 0, 255).astype(np.uint8)
 
@@ -125,7 +135,9 @@ def line_artwork(width: int = 800, height: int = 800, seed: int | None = None) -
     """Thin-line ink artwork on paper: the stress case for edge preservation."""
     rng = _rng(seed)
     canvas = np.full((height, width, 3), 247, np.float32)
-    grain = cv2.GaussianBlur(rng.normal(0, 4.0, size=(height, width)).astype(np.float32), (0, 0), 0.8)
+    grain = cv2.GaussianBlur(
+        rng.normal(0, 4.0, size=(height, width)).astype(np.float32), (0, 0), 0.8
+    )
     canvas += grain[:, :, None]
 
     centre = (width // 2, height // 2)
@@ -183,8 +195,14 @@ def add_small_overlay_badge(rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     w, h = int(width * 0.22), int(height * 0.09)
     cv2.rectangle(image, (x, y), (x + w, y + h), (30, 30, 34), -1)
     cv2.putText(
-        image, "DRAFT", (x + 12, y + int(h * 0.7)), cv2.FONT_HERSHEY_SIMPLEX,
-        max(0.5, width / 1400.0), (250, 250, 250), 2, cv2.LINE_AA,
+        image,
+        "DRAFT",
+        (x + 12, y + int(h * 0.7)),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        max(0.5, width / 1400.0),
+        (250, 250, 250),
+        2,
+        cv2.LINE_AA,
     )
     cv2.rectangle(mask, (x, y), (x + w, y + h), 255, -1)
     return image, mask
@@ -195,7 +213,9 @@ def add_small_overlay_badge(rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 # ---------------------------------------------------------------------------
 
 
-def add_signature(rgb: np.ndarray, seed: int | None = None) -> tuple[np.ndarray, tuple[int, int, int, int]]:
+def add_signature(
+    rgb: np.ndarray, seed: int | None = None
+) -> tuple[np.ndarray, tuple[int, int, int, int]]:
     """Draw a handwritten-style signature. Returns ``(image, bounding_box)``.
 
     Used to verify that the safeguard refuses to reconstruct over it.
@@ -266,7 +286,9 @@ def add_stock_watermark(
             )
     rotation = cv2.getRotationMatrix2D((width / 2.0, height / 2.0), 30.0, 1.0)
     layer = cv2.warpAffine(layer, rotation, (width, height))
-    return np.clip(rgb.astype(np.float32) + layer.astype(np.float32) * opacity, 0, 255).astype(np.uint8)
+    return np.clip(rgb.astype(np.float32) + layer.astype(np.float32) * opacity, 0, 255).astype(
+        np.uint8
+    )
 
 
 # ---------------------------------------------------------------------------

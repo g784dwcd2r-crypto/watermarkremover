@@ -70,7 +70,6 @@ def analyse_artwork(
 ) -> ArtworkAnalysis:
     """Analyse a finished artwork. Deterministic for a given ``seed``."""
     working = _fit_for_analysis(rgb)
-    height, width = working.shape[:2]
     luminance = cv2.cvtColor(working, cv2.COLOR_RGB2GRAY).astype(np.float32)
 
     palette, labels, shares = _quantise_colours(working, palette_size, seed)
@@ -255,9 +254,7 @@ def _background_and_subject(
     border_labels = labels[border]
     counts = np.bincount(border_labels, minlength=len(shares)).astype(np.float64)
     border_share = counts / max(1.0, counts.sum())
-    background_clusters = {
-        index for index, value in enumerate(border_share) if value >= 0.15
-    }
+    background_clusters = {index for index, value in enumerate(border_share) if value >= 0.15}
     if not background_clusters:
         background_clusters = {int(np.argmax(border_share))}
 

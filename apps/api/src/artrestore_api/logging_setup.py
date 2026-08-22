@@ -19,7 +19,9 @@ from contextvars import ContextVar
 request_id_var: ContextVar[str] = ContextVar("request_id", default="")
 
 #: Query strings on storage URLs carry the signature; strip them entirely.
-_SIGNED_URL = re.compile(r"(https?://[^\s\"']+)\?[^\s\"']*(signature|Signature|X-Amz-Signature)[^\s\"']*")
+_SIGNED_URL = re.compile(
+    r"(https?://[^\s\"']+)\?[^\s\"']*(signature|Signature|X-Amz-Signature)[^\s\"']*"
+)
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 
 

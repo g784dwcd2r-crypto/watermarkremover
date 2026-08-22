@@ -6,6 +6,7 @@ same short-expiry, no-listing behaviour as S3 is exercised in development.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import pathlib
 import shutil
@@ -63,16 +64,16 @@ class LocalStorage(Storage):
         path = self._path(key)
         marker = path.parent / f".{path.name}.type"
         for target in (path, marker):
-            try:
+            with contextlib.suppress(FileNotFoundError):
                 target.unlink()
-            except FileNotFoundError:
-                pass
 
     def delete_prefix(self, prefix: str) -> int:
         path = self._path(prefix)
         if not path.exists():
             return 0
-        count = sum(1 for item in path.rglob("*") if item.is_file() and not item.name.startswith("."))
+        count = sum(
+            1 for item in path.rglob("*") if item.is_file() and not item.name.startswith(".")
+        )
         shutil.rmtree(path, ignore_errors=True)
         return count
 

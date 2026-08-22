@@ -29,7 +29,9 @@ def _rank_normalise(field: np.ndarray) -> np.ndarray:
     return ranks.reshape(field.shape)
 
 
-def _low_frequency_noise(shape: tuple[int, int], rng: np.random.Generator, sigma: float) -> np.ndarray:
+def _low_frequency_noise(
+    shape: tuple[int, int], rng: np.random.Generator, sigma: float
+) -> np.ndarray:
     noise = rng.random(shape, dtype=np.float32)
     return cv2.GaussianBlur(noise, (0, 0), sigma)
 
@@ -55,9 +57,11 @@ def build_reveal_map(
         # Shadows are laid in before lights, the way a painter blocks in values.
         field = luminance / 255.0 + _low_frequency_noise((height, width), rng, 6.0) * 0.35
     elif kind == "detail":
-        field = detail_map * 0.75 + (1.0 - saliency) * 0.15 + _low_frequency_noise(
-            (height, width), rng, 5.0
-        ) * 0.2
+        field = (
+            detail_map * 0.75
+            + (1.0 - saliency) * 0.15
+            + _low_frequency_noise((height, width), rng, 5.0) * 0.2
+        )
     elif kind == "region":
         field = _region_field(labels, analysis, rng, height, width)
     elif kind == "radial":
@@ -92,7 +96,7 @@ def _region_field(
     group_count = int(labels.max()) + 1
     angle = float(rng.uniform(0, np.pi * 2))
     yy, xx = np.mgrid[0:height, 0:width].astype(np.float32)
-    sweep = (xx * np.cos(angle) + yy * np.sin(angle))
+    sweep = xx * np.cos(angle) + yy * np.sin(angle)
     sweep = (sweep - sweep.min()) / (float(sweep.max() - sweep.min()) or 1.0)
 
     for group in range(group_count):

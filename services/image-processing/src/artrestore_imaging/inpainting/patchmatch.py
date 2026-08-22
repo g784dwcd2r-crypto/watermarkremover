@@ -23,7 +23,9 @@ DOWNSCALE_PIXEL_BUDGET = 120_000
 @register_backend
 class PatchMatchBackend(InpaintBackend):
     name = "patchmatch"
-    description = "Exemplar-based texture synthesis; reproduces repeating texture rather than blurring it."
+    description = (
+        "Exemplar-based texture synthesis; reproduces repeating texture rather than blurring it."
+    )
 
     def run(self, request: InpaintRequest) -> np.ndarray:
         rgb = request.rgb
@@ -109,7 +111,9 @@ class PatchMatchBackend(InpaintBackend):
                 continue
 
             hole = unknown[y0:y1, x0:x1]
-            filled_confidence = float(confidence[y0:y1, x0:x1][~hole].mean()) if (~hole).any() else 0.1
+            filled_confidence = (
+                float(confidence[y0:y1, x0:x1][~hole].mean()) if (~hole).any() else 0.1
+            )
             working[y0:y1, x0:x1][hole] = patch[hole]
             confidence[y0:y1, x0:x1][hole] = filled_confidence
             unknown[y0:y1, x0:x1] = False
@@ -194,7 +198,9 @@ class PatchMatchBackend(InpaintBackend):
 
         # Reject source patches that themselves overlap the hole.
         hole_window = unknown[sy0:sy1, sx0:sx1].astype(np.float32)
-        integral = cv2.boxFilter(hole_window, -1, (tw, th), normalize=False, borderType=cv2.BORDER_ISOLATED)
+        integral = cv2.boxFilter(
+            hole_window, -1, (tw, th), normalize=False, borderType=cv2.BORDER_ISOLATED
+        )
         valid_h, valid_w = scores.shape
         offset_y, offset_x = th // 2, tw // 2
         overlap = integral[offset_y : offset_y + valid_h, offset_x : offset_x + valid_w]

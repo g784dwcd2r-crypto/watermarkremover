@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import logging
 
+from artrestore_imaging import encode_raster, load_safe_raster
 from fastapi import APIRouter, Query, status
 from sqlalchemy import func, select
-
-from artrestore_imaging import encode_raster, load_safe_raster
 
 from ..config import get_settings
 from ..deps import CSRFProtected, CurrentUser, DbSession, DefaultRateLimit, StorageDep
@@ -67,9 +66,7 @@ def create_export(
         .limit(1)
     ).scalar_one_or_none()
     if processed is None:
-        raise validation_error(
-            "There is no processed image to export yet. Run a cleanup first."
-        )
+        raise validation_error("There is no processed image to export yet. Run a cleanup first.")
 
     source = asset_service.primary_source_asset(db, project.id)
     raster = load_safe_raster(

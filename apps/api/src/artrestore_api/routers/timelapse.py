@@ -4,9 +4,6 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, status
-from sqlalchemy import delete, select
-
 from artrestore_timelapse import (
     CANVAS_PRESETS,
     EASING_CURVES,
@@ -19,6 +16,8 @@ from artrestore_timelapse import (
     STAGE_LABELS,
     SUPPORTED_FPS,
 )
+from fastapi import APIRouter, status
+from sqlalchemy import delete, select
 
 from ..deps import CSRFProtected, CurrentUser, DbSession, DefaultRateLimit, JobRateLimit
 from ..errors import validation_error
@@ -257,9 +256,7 @@ def _queue_render(
     )
     db.commit()
     if created:
-        job_service.dispatch(
-            job, TASK_TIMELAPSE_PREVIEW if preview else TASK_TIMELAPSE_RENDER
-        )
+        job_service.dispatch(job, TASK_TIMELAPSE_PREVIEW if preview else TASK_TIMELAPSE_RENDER)
         db.commit()
         db.refresh(job)
         logger.info(

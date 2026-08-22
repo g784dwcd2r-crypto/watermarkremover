@@ -15,8 +15,6 @@ from .models import (
     ASSET_TYPES,
     CONSENT_TYPES,
     EXPORT_FORMATS,
-    JOB_STATUSES,
-    JOB_TYPES,
     PROJECT_TYPES,
 )
 
@@ -144,9 +142,9 @@ class ProjectOut(ORMModel):
 
 
 class ProjectDetailOut(ProjectOut):
-    assets: list["AssetOut"] = Field(default_factory=list)
+    assets: list[AssetOut] = Field(default_factory=list)
     latest_mask_version: int | None = None
-    active_job: "JobOut | None" = None
+    active_job: JobOut | None = None
     ownership_confirmed: bool = False
     stage_count: int = 0
     export_count: int = 0
@@ -452,7 +450,9 @@ class TimelapseRenderRequest(BaseModel):
     mode: TimelapseMode = "sketch_to_colour"
     duration_seconds: float = Field(12.0, ge=5.0, le=300.0)
     fps: Literal[24, 30, 60] = 30
-    preset: Literal["square", "portrait_4x5", "vertical_9x16", "landscape_16x9", "source"] = "square"
+    preset: Literal["square", "portrait_4x5", "vertical_9x16", "landscape_16x9", "source"] = (
+        "square"
+    )
     formats: list[Literal["mp4", "webm", "gif", "poster", "frames", "project_json"]] = Field(
         default_factory=lambda: ["mp4"]
     )

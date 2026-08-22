@@ -131,7 +131,10 @@ export default function RegisterPage() {
               </Button>
               <p className="text-sm text-[var(--color-ink-muted)]">
                 Already have an account?{" "}
-                <Link className="text-[var(--color-primary)] underline underline-offset-4" href="/login">
+                <Link
+                  className="text-[var(--color-primary)] underline underline-offset-4"
+                  href="/login"
+                >
                   Log in
                 </Link>
               </p>

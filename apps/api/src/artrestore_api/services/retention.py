@@ -19,8 +19,10 @@ from ..storage import Storage
 logger = logging.getLogger(__name__)
 
 
-def expired_projects(db: Session, *, now: dt.datetime | None = None, limit: int = 200) -> list[Project]:
-    moment = now or dt.datetime.now(dt.timezone.utc)
+def expired_projects(
+    db: Session, *, now: dt.datetime | None = None, limit: int = 200
+) -> list[Project]:
+    moment = now or dt.datetime.now(dt.UTC)
     return list(
         db.execute(
             select(Project)
@@ -39,8 +41,10 @@ def sweep(db: Session, storage: Storage, *, now: dt.datetime | None = None) -> d
         prefix = f"users/{project.user_id}/projects/{project.id}/"
         try:
             deleted_objects += storage.delete_prefix(prefix)
-        except Exception:  # noqa: BLE001 - a storage hiccup must not stall the sweep
-            logger.exception("retention sweep could not clear storage", extra=log_context(project_id=project.id))
+        except Exception:
+            logger.exception(
+                "retention sweep could not clear storage", extra=log_context(project_id=project.id)
+            )
             continue
         db.delete(project)
         deleted_projects += 1
@@ -60,9 +64,9 @@ def apply_retention_preference(db: Session, user: User, retention_days: int) -> 
 
     for project in user.projects:
         project.retention_days = retention_days
-        base = project.created_at or dt.datetime.now(dt.timezone.utc)
+        base = project.created_at or dt.datetime.now(dt.UTC)
         if base.tzinfo is None:
-            base = base.replace(tzinfo=dt.timezone.utc)
+            base = base.replace(tzinfo=dt.UTC)
         project.delete_after = base + dt.timedelta(days=retention_days)
     db.flush()
 
@@ -78,7 +82,7 @@ def delete_account(db: Session, user: User, storage: Storage) -> dict:
     objects = 0
     try:
         objects = storage.delete_prefix(prefix)
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.exception("account deletion could not clear storage")
 
     project_count = len(user.projects)
@@ -105,7 +109,7 @@ def export_account_data(db: Session, user: User) -> dict:
     from .projects import storage_usage
 
     return {
-        "exported_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "exported_at": dt.datetime.now(dt.UTC).isoformat(),
         "account": {
             "id": user.id,
             "email": user.email,

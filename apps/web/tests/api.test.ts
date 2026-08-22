@@ -93,7 +93,11 @@ describe("apiFetch", () => {
   it("uploads to a signed URL without sending cookies", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 200 }));
     await uploadToSignedUrl(
-      { url: "https://storage.example/x?signature=abc", method: "PUT", headers: { "Content-Type": "image/png" } },
+      {
+        url: "https://storage.example/x?signature=abc",
+        method: "PUT",
+        headers: { "Content-Type": "image/png" },
+      },
       new Blob(["data"]),
     );
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: "omit", method: "PUT" });
@@ -102,7 +106,10 @@ describe("apiFetch", () => {
   it("reports a failed storage upload", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 403 }));
     await expect(
-      uploadToSignedUrl({ url: "https://storage.example/x", method: "PUT", headers: {} }, new Blob()),
+      uploadToSignedUrl(
+        { url: "https://storage.example/x", method: "PUT", headers: {} },
+        new Blob(),
+      ),
     ).rejects.toMatchObject({ code: "upload_failed" });
   });
 });

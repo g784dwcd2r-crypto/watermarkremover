@@ -1,0 +1,48 @@
+# Run once per clone:  pre-commit install
+# Run over everything: pre-commit run --all-files
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+        exclude: ^apps/web/tsconfig\.json$
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: ["--markdown-linebreak-ext=md"]
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+
+  - repo: local
+    hooks:
+      - id: prettier
+        name: prettier
+        entry: npx prettier --write
+        language: system
+        types_or: [ts, tsx, javascript, jsx, json, css, markdown]
+        exclude: ^(package-lock\.json|.*\.min\..*)$
+
+      - id: no-model-weights
+        name: refuse committed model weights
+        # Checkpoints are deployed by an operator, never vendored: a stray
+        # multi-gigabyte file in git history is effectively permanent.
+        entry: bash -c 'git diff --cached --name-only | grep -Ei "\.(pt|pth|onnx|ckpt|safetensors|bin)$" && echo "Model weights must not be committed." && exit 1 || exit 0'
+        language: system
+        pass_filenames: false

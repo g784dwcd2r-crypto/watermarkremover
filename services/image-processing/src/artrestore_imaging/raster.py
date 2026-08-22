@@ -52,7 +52,7 @@ class SafeRaster:
     def has_alpha(self) -> bool:
         return self.alpha is not None
 
-    def copy(self) -> "SafeRaster":
+    def copy(self) -> SafeRaster:
         return SafeRaster(
             rgb=self.rgb.copy(),
             alpha=None if self.alpha is None else self.alpha.copy(),
@@ -62,7 +62,7 @@ class SafeRaster:
             metadata_summary=dict(self.metadata_summary),
         )
 
-    def with_rgb(self, rgb: np.ndarray) -> "SafeRaster":
+    def with_rgb(self, rgb: np.ndarray) -> SafeRaster:
         """Return a copy carrying new pixel data at identical dimensions."""
         if rgb.shape[:2] != self.rgb.shape[:2]:
             raise CorruptImageError("Processed pixels changed the image dimensions.")
@@ -102,7 +102,7 @@ def load_safe_raster(data: bytes, *, max_pixels: int | None = 50_000_000) -> Saf
                 alpha = np.ascontiguousarray(array[:, :, 3])
             else:
                 rgb = np.array(oriented.convert("RGB"), dtype=np.uint8)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise CorruptImageError(f"The image could not be decoded: {exc}") from exc
     finally:
         Image.MAX_IMAGE_PIXELS = previous_limit

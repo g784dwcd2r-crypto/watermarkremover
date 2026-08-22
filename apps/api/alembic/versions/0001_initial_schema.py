@@ -5,17 +5,16 @@ assets, masks, processing jobs, timelapse stages, exports and consent
 records.
 
 Revision ID: 0001_initial
-Revises: 
+Revises: none
 Create Date: 2026-08-20 13:47:14.544516
 """
 
 from __future__ import annotations
 
-from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
-
 import artrestore_api.db
+import sqlalchemy as sa
+from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision = '0001_initial'
 down_revision = None

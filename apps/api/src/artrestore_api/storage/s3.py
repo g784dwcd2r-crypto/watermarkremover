@@ -65,7 +65,7 @@ class S3Storage(Storage):
     def get_bytes(self, key: str) -> bytes:
         try:
             response = self.client.get_object(Bucket=self.bucket, Key=key)
-        except Exception as exc:  # noqa: BLE001 - botocore raises dynamic classes
+        except Exception as exc:
             if "NoSuchKey" in str(exc) or "404" in str(exc):
                 raise ObjectNotFoundError(key) from exc
             raise StorageError(str(exc)) from exc
@@ -91,14 +91,14 @@ class S3Storage(Storage):
     def exists(self, key: str) -> bool:
         try:
             self.client.head_object(Bucket=self.bucket, Key=key)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return False
         return True
 
     def size(self, key: str) -> int:
         try:
             response = self.client.head_object(Bucket=self.bucket, Key=key)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise ObjectNotFoundError(key) from exc
         return int(response["ContentLength"])
 
@@ -110,9 +110,7 @@ class S3Storage(Storage):
         params: dict[str, Any] = {"Bucket": self.bucket, "Key": key}
         if filename:
             params["ResponseContentDisposition"] = f'attachment; filename="{filename}"'
-        return self.client.generate_presigned_url(
-            "get_object", Params=params, ExpiresIn=expires_in
-        )
+        return self.client.generate_presigned_url("get_object", Params=params, ExpiresIn=expires_in)
 
     def signed_upload(
         self, key: str, *, content_type: str, expires_in: int = 300, max_bytes: int = 0
@@ -139,7 +137,7 @@ class S3Storage(Storage):
     def health(self) -> dict:
         try:
             self.client.head_bucket(Bucket=self.bucket)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return {"backend": self.name, "ok": False, "error": type(exc).__name__}
         return {"backend": self.name, "ok": True, "bucket": self.bucket}
 
@@ -147,7 +145,7 @@ class S3Storage(Storage):
         """Create the bucket when it is missing (development convenience)."""
         try:
             self.client.head_bucket(Bucket=self.bucket)
-        except Exception:  # noqa: BLE001
+        except Exception:
             kwargs: dict[str, Any] = {"Bucket": self.bucket}
             if self.region and self.region != "us-east-1":
                 kwargs["CreateBucketConfiguration"] = {"LocationConstraint": self.region}

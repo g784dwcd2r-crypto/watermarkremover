@@ -1,6 +1,15 @@
 "use client";
 
-import { Alert, Badge, Button, Card, CardContent, EmptyState, Skeleton, formatBytes } from "@artrestore/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  EmptyState,
+  Skeleton,
+  formatBytes,
+} from "@artrestore/ui";
 import { Download, FileBox, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -83,7 +92,7 @@ export default function ExportsPage() {
                           {output.toUpperCase()}
                         </Badge>
                         {isPreview ? <Badge tone="neutral">Preview</Badge> : null}
-                        <span className="text-sm tabular-nums text-[var(--color-ink-muted)]">
+                        <span className="text-sm text-[var(--color-ink-muted)] tabular-nums">
                           {formatBytes(record.byte_size)}
                         </span>
                       </div>
@@ -93,13 +102,16 @@ export default function ExportsPage() {
                       {reconstruction ? (
                         <p className="mt-1.5 text-xs text-[var(--color-ink-muted)]">
                           Labelled in file metadata as{" "}
-                          <span className="font-medium text-[var(--color-ink)]">{reconstruction}</span>
+                          <span className="font-medium text-[var(--color-ink)]">
+                            {reconstruction}
+                          </span>
                         </p>
                       ) : disclosure.provenance_preserved ? (
                         <p className="mt-1.5 text-xs text-[var(--color-ink-muted)]">
                           Original metadata preserved:{" "}
-                          {(disclosure.preserved_metadata_blocks as string[] | undefined)?.join(", ") ||
-                            "none present"}
+                          {(disclosure.preserved_metadata_blocks as string[] | undefined)?.join(
+                            ", ",
+                          ) || "none present"}
                         </p>
                       ) : null}
                     </div>

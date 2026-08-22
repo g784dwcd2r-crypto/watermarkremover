@@ -38,7 +38,9 @@ export function UploadDropzone({
   const upload = useUploadAsset(projectId);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [file, setFile] = React.useState<File | null>(null);
-  const [dimensions, setDimensions] = React.useState<{ width: number; height: number } | null>(null);
+  const [dimensions, setDimensions] = React.useState<{ width: number; height: number } | null>(
+    null,
+  );
   const [owns, setOwns] = React.useState(!requireOwnership);
   const [dragging, setDragging] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -71,7 +73,9 @@ export function UploadDropzone({
       return;
     }
     if (candidate.size > MAX_BYTES) {
-      setError(`That file is ${formatBytes(candidate.size)}; the limit is ${formatBytes(MAX_BYTES)}.`);
+      setError(
+        `That file is ${formatBytes(candidate.size)}; the limit is ${formatBytes(MAX_BYTES)}.`,
+      );
       return;
     }
     setFile(candidate);
@@ -215,7 +219,11 @@ export function UploadDropzone({
       ) : null}
 
       <div className="flex items-center gap-3">
-        <Button onClick={submit} disabled={!file || !owns || upload.isPending} loading={upload.isPending}>
+        <Button
+          onClick={submit}
+          disabled={!file || !owns || upload.isPending}
+          loading={upload.isPending}
+        >
           {upload.isPending ? "Uploading" : "Upload and continue"}
         </Button>
         {!owns && requireOwnership ? (
@@ -224,7 +232,10 @@ export function UploadDropzone({
           </p>
         ) : null}
         {upload.isPending ? (
-          <Loader2 className="size-4 animate-spin text-[var(--color-ink-subtle)]" aria-hidden="true" />
+          <Loader2
+            className="size-4 animate-spin text-[var(--color-ink-subtle)]"
+            aria-hidden="true"
+          />
         ) : null}
       </div>
     </div>

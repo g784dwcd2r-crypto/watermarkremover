@@ -53,9 +53,7 @@ test.describe("cleanup workflow", () => {
     await register(page);
     await page.goto("/projects/new?type=cleanup");
     await page.getByLabel("Project name").fill("Retention copy");
-    await page
-      .getByRole("combobox", { name: /delete my files automatically after/i })
-      .click();
+    await page.getByRole("combobox", { name: /delete my files automatically after/i }).click();
     await page.getByRole("option", { name: "1 day" }).click();
     await page.getByRole("button", { name: "Create project" }).click();
 

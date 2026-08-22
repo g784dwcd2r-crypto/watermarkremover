@@ -113,7 +113,7 @@ class Stage:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Stage":
+    def from_dict(cls, data: dict) -> Stage:
         return cls(
             stage_type=str(data.get("stage_type", "final_hold")),
             order_index=int(data.get("order_index", 0)),

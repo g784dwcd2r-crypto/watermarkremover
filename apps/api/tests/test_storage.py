@@ -5,7 +5,6 @@ from __future__ import annotations
 import time
 
 import pytest
-
 from artrestore_api.storage import ObjectNotFoundError, StorageError, build_object_key
 from artrestore_api.storage.local import LocalStorage
 
@@ -71,7 +70,7 @@ def test_signed_download_url_verifies(storage):
 def test_expired_signature_is_rejected(storage):
     key = "users/u1/projects/p1/export/out.png"
     expired = int(time.time()) - 10
-    signature = storage._signature(key, expired, "GET")  # noqa: SLF001 - white-box check
+    signature = storage._signature(key, expired, "GET")
     assert storage.verify_signature(key, expired, signature, "GET") is False
 
 

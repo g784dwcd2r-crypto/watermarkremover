@@ -155,32 +155,52 @@ def encode_video(
 
     if container == "webm":
         codec_arguments = [
-            "-c:v", "libvpx-vp9",
-            "-b:v", "0",
-            "-crf", str(crf + 12),
-            "-row-mt", "1",
-            "-pix_fmt", "yuv420p",
+            "-c:v",
+            "libvpx-vp9",
+            "-b:v",
+            "0",
+            "-crf",
+            str(crf + 12),
+            "-row-mt",
+            "1",
+            "-pix_fmt",
+            "yuv420p",
         ]
         audio_codec = ["-c:a", "libopus", "-b:a", "128k"]
     else:
         container = "mp4"
         codec_arguments = [
-            "-c:v", "libx264",
-            "-profile:v", "high",
-            "-preset", "medium",
-            "-crf", str(crf),
-            "-pix_fmt", "yuv420p",
-            "-movflags", "+faststart",
+            "-c:v",
+            "libx264",
+            "-profile:v",
+            "high",
+            "-preset",
+            "medium",
+            "-crf",
+            str(crf),
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
         ]
         audio_codec = ["-c:a", "aac", "-b:a", "160k"]
 
     command = [
-        binary, "-hide_banner", "-loglevel", "error", "-y",
-        "-f", "rawvideo",
-        "-pix_fmt", "rgb24",
-        "-s", f"{width}x{height}",
-        "-r", str(fps),
-        "-i", "pipe:0",
+        binary,
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "-s",
+        f"{width}x{height}",
+        "-r",
+        str(fps),
+        "-i",
+        "pipe:0",
     ]
     frame_count_holder: list[int] = [0]
 
@@ -192,8 +212,10 @@ def encode_video(
             [
                 "-filter:a",
                 f"volume={max(0.0, min(1.0, audio.volume)):.3f}",
-                "-map", "0:v:0",
-                "-map", "1:a:0",
+                "-map",
+                "0:v:0",
+                "-map",
+                "1:a:0",
                 "-shortest",
             ]
         )
@@ -276,9 +298,7 @@ def encode_gif(
         image = Image.fromarray(np.ascontiguousarray(frame, dtype=np.uint8), mode="RGB")
         if image.width > max_width:
             scale = max_width / float(image.width)
-            image = image.resize(
-                (max_width, max(1, int(image.height * scale))), Image.LANCZOS
-            )
+            image = image.resize((max_width, max(1, int(image.height * scale))), Image.LANCZOS)
         size = image.size
         images.append(image.convert("P", palette=Image.ADAPTIVE, colors=128))
 
@@ -401,9 +421,13 @@ def probe(path: str | Path, binary: str = "ffprobe") -> dict:
         raise EncoderUnavailableError("ffprobe is not installed.")
     result = subprocess.run(
         [
-            binary, "-v", "error",
-            "-show_format", "-show_streams",
-            "-print_format", "json",
+            binary,
+            "-v",
+            "error",
+            "-show_format",
+            "-show_streams",
+            "-print_format",
+            "json",
             str(path),
         ],
         capture_output=True,

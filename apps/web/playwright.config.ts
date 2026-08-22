@@ -9,9 +9,7 @@ const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 // Playwright expects. PLAYWRIGHT_CHROMIUM_EXECUTABLE points at the one that is
 // actually present instead of downloading another copy.
 const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
-const launchOptions = chromiumPath
-  ? { launchOptions: { executablePath: chromiumPath } }
-  : {};
+const launchOptions = chromiumPath ? { launchOptions: { executablePath: chromiumPath } } : {};
 
 export default defineConfig({
   testDir: "./e2e",

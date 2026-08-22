@@ -15,9 +15,9 @@ const buttonVariants = cva(
           "bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:bg-[var(--color-primary-hover)]",
         secondary:
           "border border-[var(--color-line-strong)] bg-[var(--color-paper-raised)] text-[var(--color-ink)] hover:bg-[var(--color-paper-sunken)]",
-        accent:
-          "bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:brightness-95",
-        ghost: "text-[var(--color-ink-muted)] hover:bg-[var(--color-paper-sunken)] hover:text-[var(--color-ink)]",
+        accent: "bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:brightness-95",
+        ghost:
+          "text-[var(--color-ink-muted)] hover:bg-[var(--color-paper-sunken)] hover:text-[var(--color-ink)]",
         danger: "bg-[var(--color-danger)] text-white hover:brightness-95",
         link: "text-[var(--color-primary)] underline underline-offset-4 hover:text-[var(--color-primary-hover)]",
       },
@@ -33,8 +33,7 @@ const buttonVariants = cva(
 );
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   asChild?: boolean;
   /** Renders a spinner and marks the control busy for assistive technology. */
   loading?: boolean;

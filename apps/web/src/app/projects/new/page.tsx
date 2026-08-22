@@ -92,7 +92,8 @@ function NewProjectForm() {
                 {
                   value: "cleanup",
                   label: "Clean an image",
-                  description: "Remove an overlay, date stamp or obsolete mark you are authorized to remove.",
+                  description:
+                    "Remove an overlay, date stamp or obsolete mark you are authorized to remove.",
                 },
                 {
                   value: "timelapse",

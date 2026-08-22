@@ -1,6 +1,15 @@
 "use client";
 
-import { Alert, Button, Card, CardContent, CardHeader, CardTitle, Field, Input } from "@artrestore/ui";
+import {
+  Alert,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Field,
+  Input,
+} from "@artrestore/ui";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
@@ -98,10 +107,7 @@ function LoginForm() {
                   return;
                 }
                 setError(null);
-                magicLink.mutate(
-                  { email },
-                  { onSuccess: (data) => setNotice(data.message) },
-                );
+                magicLink.mutate({ email }, { onSuccess: (data) => setNotice(data.message) });
               }}
             >
               Email me a sign-in link instead
@@ -124,7 +130,10 @@ function LoginForm() {
             </Button>
             <p className="mt-2 text-[var(--color-ink-muted)]">
               No account yet?{" "}
-              <Link className="text-[var(--color-primary)] underline underline-offset-4" href="/register">
+              <Link
+                className="text-[var(--color-primary)] underline underline-offset-4"
+                href="/register"
+              >
                 Create one
               </Link>
             </p>

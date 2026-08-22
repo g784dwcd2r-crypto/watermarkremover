@@ -8,8 +8,8 @@ configuration) can select one without importing optional heavy dependencies.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 import numpy as np
 

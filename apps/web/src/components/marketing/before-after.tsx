@@ -59,7 +59,7 @@ export function BeforeAfter({
     <figure className={cn("flex flex-col gap-3", className)}>
       <div
         ref={containerRef}
-        className="relative select-none overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-paper-sunken)]"
+        className="relative overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-paper-sunken)] select-none"
         onPointerDown={(event) => {
           dragging.current = true;
           updateFromClientX(event.clientX);
@@ -97,10 +97,10 @@ export function BeforeAfter({
           className="absolute inset-x-0 bottom-3 mx-auto w-[calc(100%-2rem)] cursor-ew-resize accent-[var(--color-primary)]"
         />
 
-        <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-[var(--color-ink)]/75 px-2.5 py-1 text-xs font-medium text-white">
+        <span className="pointer-events-none absolute top-3 left-3 rounded-full bg-[var(--color-ink)]/75 px-2.5 py-1 text-xs font-medium text-white">
           {beforeLabel}
         </span>
-        <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-[var(--color-primary)]/90 px-2.5 py-1 text-xs font-medium text-white">
+        <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-[var(--color-primary)]/90 px-2.5 py-1 text-xs font-medium text-white">
           {afterLabel}
         </span>
       </div>

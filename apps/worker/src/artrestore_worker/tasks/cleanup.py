@@ -36,7 +36,7 @@ celery_app = get_celery_app()
 
 
 @celery_app.task(name=TASK_CLEANUP, bind=True, acks_late=True)
-def run_cleanup_task(self, job_id: str) -> dict:  # noqa: ARG001 - bind gives self
+def run_cleanup_task(self, job_id: str) -> dict:
     """Execute one cleanup job."""
     from artrestore_api.config import get_settings
 
@@ -88,7 +88,9 @@ def run_cleanup_task(self, job_id: str) -> dict:  # noqa: ARG001 - bind gives se
             mask_version = mask_row.version
 
         reporter.report(0.02, "Loading image", force=True)
-        raster = load_safe_raster(storage.get_bytes(source_key), max_pixels=settings.max_image_pixels)
+        raster = load_safe_raster(
+            storage.get_bytes(source_key), max_pixels=settings.max_image_pixels
+        )
 
         raw_mask = rasterize_editor_state(editor_state, raster.width, raster.height)
         adjustments = MaskAdjustments.from_dict(
@@ -149,11 +151,15 @@ def run_cleanup_task(self, job_id: str) -> dict:  # noqa: ARG001 - bind gives se
             job = session.get(ProcessingJob, job_id)
             if job is not None:
                 job_service.mark_failed(
-                    session, job, code=exc.code, message=exc.message, result={"details": exc.details}
+                    session,
+                    job,
+                    code=exc.code,
+                    message=exc.message,
+                    result={"details": exc.details},
                 )
         logger.warning("cleanup rejected", extra=log_context(job_id=job_id, code=exc.code))
         return {"status": "failed", "code": exc.code}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.exception("cleanup failed", extra=log_context(job_id=job_id))
         with session_scope() as session:
             job = session.get(ProcessingJob, job_id)

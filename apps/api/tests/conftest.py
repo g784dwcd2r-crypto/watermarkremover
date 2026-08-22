@@ -10,7 +10,6 @@ from __future__ import annotations
 import base64
 import os
 import pathlib
-import sys
 
 import pytest
 
@@ -57,7 +56,6 @@ def app(_environment):
 
     # Registering the worker tasks lets eager mode execute them in-process.
     import artrestore_worker.tasks  # noqa: F401
-
     from artrestore_api.main import create_app
 
     return create_app()
@@ -74,10 +72,9 @@ def client(app):
 @pytest.fixture(autouse=True)
 def _clean_database(app):
     """Truncate between tests so ordering never matters."""
-    from sqlalchemy import delete
-
-    from artrestore_api.db import get_engine, session_scope
     from artrestore_api import models
+    from artrestore_api.db import get_engine, session_scope
+    from sqlalchemy import delete
 
     yield
     with session_scope() as session:
@@ -169,8 +166,16 @@ class ApiClient:
         assert response.status_code == 201, response.text
         return response.json()
 
-    def upload_image(self, project_id: str, data: bytes, *, filename="demo.png",
-                     content_type="image/png", asset_type="source", confirm=True):
+    def upload_image(
+        self,
+        project_id: str,
+        data: bytes,
+        *,
+        filename="demo.png",
+        content_type="image/png",
+        asset_type="source",
+        confirm=True,
+    ):
         """Run the full signed-upload handshake and return the completion response."""
         init = self.post(
             f"/v1/projects/{project_id}/assets/uploads",

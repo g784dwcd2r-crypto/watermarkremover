@@ -33,9 +33,7 @@ describe("UploadDropzone", () => {
 
   it("states the exact ownership wording", () => {
     renderWithQuery(<UploadDropzone projectId="p1" />);
-    expect(
-      screen.getByText("I own this image or have permission to edit it."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("I own this image or have permission to edit it.")).toBeInTheDocument();
   });
 
   it("rejects an unsupported file type before any request is made", async () => {

@@ -26,9 +26,7 @@ test.describe("timelapse reconstruction", () => {
     await page.getByRole("link", { name: /open the timelapse editor/i }).click();
     await expect(page).toHaveURL(/\/timelapse$/);
 
-    await expect(
-      page.getByText(/labelled a reconstruction in its file metadata/i),
-    ).toBeVisible();
+    await expect(page.getByText(/labelled a reconstruction in its file metadata/i)).toBeVisible();
 
     // The metadata disclosure is explicitly described as non-optional.
     await expect(page.getByText(/cannot be turned off/i)).toBeVisible();
@@ -60,8 +58,9 @@ test.describe("timelapse reconstruction", () => {
     await page.getByRole("link", { name: /open the timelapse editor/i }).click();
 
     await page.getByRole("combobox", { name: "Mode" }).click();
-    await expect(
-      page.getByRole("option", { name: /Real Intermediate Frames/i }),
-    ).toHaveAttribute("data-disabled", "");
+    await expect(page.getByRole("option", { name: /Real Intermediate Frames/i })).toHaveAttribute(
+      "data-disabled",
+      "",
+    );
   });
 });

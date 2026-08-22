@@ -38,7 +38,7 @@ export function Slider({
         <label htmlFor={id} className="text-sm font-medium text-[var(--color-ink)]">
           {label}
         </label>
-        <span className="text-xs tabular-nums text-[var(--color-ink-muted)]">{display}</span>
+        <span className="text-xs text-[var(--color-ink-muted)] tabular-nums">{display}</span>
       </div>
       <SliderPrimitive.Root
         value={[value]}

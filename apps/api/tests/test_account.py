@@ -61,7 +61,7 @@ def test_retention_sweep_deletes_expired_projects(api, demo_images):
 
     with session_scope() as session:
         row = session.get(Project, project["id"])
-        row.delete_after = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=1)
+        row.delete_after = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=1)
 
     storage = get_storage()
     with session_scope() as session:
@@ -113,9 +113,7 @@ def test_account_deletion_removes_everything(api, demo_images):
     api.upload_image(project["id"], demo_images["stamped_png"])
     prefix = f"users/{api.user['id']}/"
 
-    response = api.post(
-        "/v1/account/delete", json={"confirm": "DELETE", "password": api.password}
-    )
+    response = api.post("/v1/account/delete", json={"confirm": "DELETE", "password": api.password})
     assert response.status_code == 204
 
     # The session is gone and the account cannot sign back in.

@@ -16,8 +16,8 @@ for erasing attribution.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
 
 import cv2
 import numpy as np
@@ -210,7 +210,9 @@ def stroke_statistics(ink: np.ndarray) -> dict:
     mean_width = float(widths.mean())
     std_width = float(widths.std())
 
-    count, _, stats, _ = cv2.connectedComponentsWithStats((ink > 0).astype(np.uint8), connectivity=8)
+    count, _, stats, _ = cv2.connectedComponentsWithStats(
+        (ink > 0).astype(np.uint8), connectivity=8
+    )
     areas = sorted((int(stats[i, cv2.CC_STAT_AREA]) for i in range(1, count)), reverse=True)
 
     return {
@@ -246,7 +248,9 @@ def trace_statistics(gray_crop: np.ndarray) -> dict:
     edges = cv2.Canny(
         blurred, int(max(0, 0.66 * median)), int(min(255, 1.33 * median)), L2gradient=True
     )
-    edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
+    edges = cv2.morphologyEx(
+        edges, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    )
 
     contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
     edge_density = float((edges > 0).mean())
@@ -287,9 +291,7 @@ def _axis_alignment(contour: np.ndarray, *, step: int = 4, tolerance: float = 12
     deltas = points[step:] - points[:-step]
     angles = np.degrees(np.arctan2(deltas[:, 1], deltas[:, 0])) % 180.0
     aligned = (
-        (angles < tolerance)
-        | (np.abs(angles - 90.0) < tolerance)
-        | (angles > 180.0 - tolerance)
+        (angles < tolerance) | (np.abs(angles - 90.0) < tolerance) | (angles > 180.0 - tolerance)
     )
     return round(float(aligned.mean()), 3)
 
@@ -302,11 +304,11 @@ def _ocr_text(bgr_or_gray: np.ndarray) -> str | None:
     """
     try:  # pragma: no cover - depends on an optional system binary
         import pytesseract
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
     try:  # pragma: no cover
         return str(pytesseract.image_to_string(bgr_or_gray, config="--psm 7")).strip().lower()
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
 
 
@@ -396,7 +398,9 @@ def detect_overlay_candidates(
             )
         )
 
-    candidates.sort(key=lambda region: (region.confidence, region.width * region.height), reverse=True)
+    candidates.sort(
+        key=lambda region: (region.confidence, region.width * region.height), reverse=True
+    )
     return candidates[:limit]
 
 
@@ -628,8 +632,18 @@ def detect_protected_regions(
         keyword = _keyword_hit(text)
         if keyword:
             kind = "copyright_notice"
-            if keyword in ("getty", "gettyimages", "shutterstock", "adobe stock", "istock",
-                           "istockphoto", "alamy", "depositphotos", "dreamstime", "123rf"):
+            if keyword in (
+                "getty",
+                "gettyimages",
+                "shutterstock",
+                "adobe stock",
+                "istock",
+                "istockphoto",
+                "alamy",
+                "depositphotos",
+                "dreamstime",
+                "123rf",
+            ):
                 kind = "agency_mark"
             elif keyword in ("content credentials", "c2pa"):
                 kind = "provenance_label"

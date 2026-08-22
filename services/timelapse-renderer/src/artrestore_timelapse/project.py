@@ -33,7 +33,7 @@ def build_project_json(
     """Assemble the reproducibility document for one render."""
     return {
         "version": PROJECT_JSON_VERSION,
-        "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "generated_at": dt.datetime.now(dt.UTC).isoformat(),
         "generator": "ArtRestore Studio timelapse renderer",
         "disclosure": {
             "reconstruction_type": RECONSTRUCTION_TYPE,

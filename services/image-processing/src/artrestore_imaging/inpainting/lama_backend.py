@@ -61,12 +61,12 @@ class LamaBackend(InpaintBackend):
         if path.endswith(".onnx"):
             try:
                 import onnxruntime  # noqa: F401
-            except Exception:  # noqa: BLE001
+            except Exception:
                 return False
             return True
         try:
             import torch  # noqa: F401
-        except Exception:  # noqa: BLE001
+        except Exception:
             return False
         return True
 

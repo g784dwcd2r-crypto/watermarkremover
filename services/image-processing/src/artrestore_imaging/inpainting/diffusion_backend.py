@@ -53,7 +53,7 @@ class DiffusionBackend(InpaintBackend):
         try:
             import diffusers  # noqa: F401
             import torch  # noqa: F401
-        except Exception:  # noqa: BLE001
+        except Exception:
             return False
         return True
 

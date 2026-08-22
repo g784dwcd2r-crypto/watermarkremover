@@ -41,7 +41,7 @@ export function PageHeader({
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-2xl">
         {eyebrow ? (
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-[var(--color-primary)]">
+          <p className="mb-1 text-xs font-semibold tracking-wider text-[var(--color-primary)] uppercase">
             {eyebrow}
           </p>
         ) : null}

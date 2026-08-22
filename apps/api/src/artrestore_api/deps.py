@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import Annotated, Callable
+from collections.abc import Callable
+from typing import Annotated
 
 from fastapi import Depends, Request, Response
 from sqlalchemy import select
@@ -104,7 +105,11 @@ def rate_limit(bucket: str, limit_getter: Callable[[Settings], int]) -> Callable
         identity = getattr(request.state, "user_id", None)
         if not identity:
             token = request.cookies.get(settings.session_cookie_name)
-            identity = hash_token(token)[:16] if token else (request.client.host if request.client else "anonymous")
+            identity = (
+                hash_token(token)[:16]
+                if token
+                else (request.client.host if request.client else "anonymous")
+            )
         limiter = get_rate_limiter()
         result = limiter.check(f"{bucket}:{identity}", limit_getter(settings))
         for header, value in result.headers().items():

@@ -23,7 +23,6 @@ from ..logging_setup import log_context, truncate_key
 from ..models import Asset
 from ..schemas import (
     AssetAnalysisOut,
-    AssetOut,
     AssetWithUrlOut,
     UploadCompleteRequest,
     UploadInitOut,

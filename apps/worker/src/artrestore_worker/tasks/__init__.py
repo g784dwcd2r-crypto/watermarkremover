@@ -3,10 +3,12 @@
 Importing this package registers every task on the shared Celery application.
 """
 
-from . import cleanup  # noqa: F401
-from . import retention  # noqa: F401
+import contextlib
 
-try:  # the timelapse tasks arrive with the renderer service
+from . import (
+    cleanup,  # noqa: F401
+    retention,  # noqa: F401
+)
+
+with contextlib.suppress(ImportError):  # the renderer service is optional
     from . import timelapse  # noqa: F401
-except ImportError:  # pragma: no cover
-    pass

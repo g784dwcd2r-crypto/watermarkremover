@@ -143,7 +143,7 @@ def validate_image_bytes(
         ) from exc
     except UnidentifiedImageError as exc:
         raise UnsupportedFormatError("The file could not be identified as an image.") from exc
-    except Exception as exc:  # noqa: BLE001 - Pillow raises many container errors
+    except Exception as exc:
         raise CorruptImageError(f"The image could not be decoded: {exc}") from exc
     finally:
         Image.MAX_IMAGE_PIXELS = previous_limit

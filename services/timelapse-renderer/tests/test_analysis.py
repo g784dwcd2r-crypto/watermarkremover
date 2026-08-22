@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-
 from artrestore_imaging import demo
 from artrestore_timelapse import analyse_artwork
 

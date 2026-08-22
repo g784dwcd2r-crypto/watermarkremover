@@ -57,7 +57,10 @@
       radial-gradient(circle at 12% 18%, rgb(0 0 0 / 0.018) 0 1px, transparent 1px),
       radial-gradient(circle at 68% 72%, rgb(0 0 0 / 0.014) 0 1px, transparent 1px),
       radial-gradient(circle at 42% 88%, rgb(0 0 0 / 0.012) 0 1px, transparent 1px);
-    background-size: 22px 22px, 31px 31px, 17px 17px;
+    background-size:
+      22px 22px,
+      31px 31px,
+      17px 17px;
   }
 
   .skip-link {

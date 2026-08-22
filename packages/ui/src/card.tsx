@@ -31,11 +31,17 @@ export function CardTitle({
   ...props
 }: React.HTMLAttributes<HTMLHeadingElement> & { as?: "h2" | "h3" | "h4" }) {
   return (
-    <Component className={cn("text-base font-semibold text-[var(--color-ink)]", className)} {...props} />
+    <Component
+      className={cn("text-base font-semibold text-[var(--color-ink)]", className)}
+      {...props}
+    />
   );
 }
 
-export function CardDescription({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
+export function CardDescription({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLParagraphElement>) {
   return <p className={cn("text-sm text-[var(--color-ink-muted)]", className)} {...props} />;
 }
 
@@ -46,7 +52,10 @@ export function CardContent({ className, ...props }: React.HTMLAttributes<HTMLDi
 export function CardFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("flex items-center gap-3 border-t border-[var(--color-line)] px-5 py-4", className)}
+      className={cn(
+        "flex items-center gap-3 border-t border-[var(--color-line)] px-5 py-4",
+        className,
+      )}
       {...props}
     />
   );

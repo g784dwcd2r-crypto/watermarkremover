@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 
 def test_create_and_fetch_project(api):
     project = api.create_project(name="Client retouch", project_type="cleanup")
@@ -64,7 +62,7 @@ def test_delete_project_removes_stored_objects(api, demo_images):
     from artrestore_api.storage import get_storage
 
     project = api.create_project()
-    asset_id, complete = api.upload_image(project["id"], demo_images["stamped_png"])
+    _, complete = api.upload_image(project["id"], demo_images["stamped_png"])
     assert complete.status_code == 200
 
     storage = get_storage()
@@ -104,7 +102,10 @@ def test_other_user_cannot_read_project(api, other_api, demo_images):
 
 def test_other_user_cannot_modify_project(api, other_api):
     project = api.create_project()
-    assert other_api.patch(f"/v1/projects/{project['id']}", json={"name": "hijacked"}).status_code == 404
+    assert (
+        other_api.patch(f"/v1/projects/{project['id']}", json={"name": "hijacked"}).status_code
+        == 404
+    )
     assert other_api.delete(f"/v1/projects/{project['id']}").status_code == 404
 
 
@@ -113,9 +114,7 @@ def test_other_user_cannot_list_or_download_assets(api, other_api, demo_images):
     asset_id, _ = api.upload_image(project["id"], demo_images["stamped_png"])
 
     assert other_api.get(f"/v1/projects/{project['id']}/assets").status_code == 404
-    assert (
-        other_api.get(f"/v1/projects/{project['id']}/assets/{asset_id}").status_code == 404
-    )
+    assert other_api.get(f"/v1/projects/{project['id']}/assets/{asset_id}").status_code == 404
 
 
 def test_other_user_cannot_queue_a_job(api, other_api, demo_images):

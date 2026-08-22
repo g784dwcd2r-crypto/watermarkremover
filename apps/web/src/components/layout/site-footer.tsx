@@ -12,16 +12,28 @@ export function SiteFooter() {
           </p>
         </div>
         <nav aria-label="Footer" className="grid grid-cols-2 gap-x-10 gap-y-2 text-sm">
-          <Link className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" href="/authorized-use-policy">
+          <Link
+            className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+            href="/authorized-use-policy"
+          >
             Authorized-use policy
           </Link>
-          <Link className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" href="/privacy">
+          <Link
+            className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+            href="/privacy"
+          >
             Privacy
           </Link>
-          <Link className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" href="/terms">
+          <Link
+            className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+            href="/terms"
+          >
             Terms
           </Link>
-          <Link className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" href="/dashboard">
+          <Link
+            className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+            href="/dashboard"
+          >
             Dashboard
           </Link>
         </nav>

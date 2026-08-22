@@ -1,0 +1,53 @@
+# ---------------------------------------------------------------------------
+# ArtRestore Studio API
+#
+# The imaging and rendering code is shared with the worker, so both images are
+# built from this same base layer: one dependency install, two entrypoints.
+# ---------------------------------------------------------------------------
+FROM python:3.11-slim-bookworm AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# libgl/libglib are OpenCV runtime dependencies; ffmpeg is required for video
+# export. Everything else stays out of the image.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        libgl1 \
+        libglib2.0-0 \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY services/image-processing /app/services/image-processing
+COPY services/timelapse-renderer /app/services/timelapse-renderer
+COPY apps/api /app/apps/api
+COPY apps/worker /app/apps/worker
+
+RUN pip install --no-cache-dir \
+        -e /app/services/image-processing \
+        -e /app/services/timelapse-renderer \
+        -e /app/apps/api \
+        -e /app/apps/worker
+
+# Run as a non-root user; the storage mount is the only writable path needed.
+RUN useradd --create-home --uid 10001 artrestore \
+    && mkdir -p /app/storage-data \
+    && chown -R artrestore:artrestore /app
+USER artrestore
+
+# ---------------------------------------------------------------------------
+FROM base AS api
+
+ENV ARS_STORAGE_BACKEND=s3
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS http://localhost:8000/healthz || exit 1
+
+WORKDIR /app/apps/api
+CMD ["uvicorn", "artrestore_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]

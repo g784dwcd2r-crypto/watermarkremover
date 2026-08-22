@@ -54,8 +54,20 @@ describe("accessibility", () => {
           onValueChange={() => {}}
           options={[{ value: "square", label: "Square" }]}
         />
-        <Slider id="a11y-slider" label="Feather" value={4} min={0} max={64} onValueChange={() => {}} />
-        <Switch id="a11y-switch" label="Dark workspace" checked={false} onCheckedChange={() => {}} />
+        <Slider
+          id="a11y-slider"
+          label="Feather"
+          value={4}
+          min={0}
+          max={64}
+          onValueChange={() => {}}
+        />
+        <Switch
+          id="a11y-switch"
+          label="Dark workspace"
+          checked={false}
+          onCheckedChange={() => {}}
+        />
         <Button>Save</Button>
       </form>,
     );
@@ -94,8 +106,22 @@ describe("accessibility", () => {
 
   it("the stage timeline has no violations", async () => {
     const stages: EditableStage[] = [
-      { stage_type: "blank_canvas", label: "Blank canvas", order_index: 0, duration: 1, enabled: true, settings: {} },
-      { stage_type: "base_colours", label: "Base colours", order_index: 1, duration: 6, enabled: true, settings: {} },
+      {
+        stage_type: "blank_canvas",
+        label: "Blank canvas",
+        order_index: 0,
+        duration: 1,
+        enabled: true,
+        settings: {},
+      },
+      {
+        stage_type: "base_colours",
+        label: "Base colours",
+        order_index: 1,
+        duration: 6,
+        enabled: true,
+        settings: {},
+      },
     ];
     const { container } = render(<StageTimeline stages={stages} onChange={() => {}} />);
     await expectNoViolations(container);
@@ -151,8 +177,22 @@ describe("accessibility", () => {
 
   it("icon-only controls carry accessible names", () => {
     const stages: EditableStage[] = [
-      { stage_type: "blank_canvas", label: "Blank canvas", order_index: 0, duration: 3, enabled: true, settings: {} },
-      { stage_type: "final_hold", label: "Finished", order_index: 1, duration: 4, enabled: true, settings: {} },
+      {
+        stage_type: "blank_canvas",
+        label: "Blank canvas",
+        order_index: 0,
+        duration: 3,
+        enabled: true,
+        settings: {},
+      },
+      {
+        stage_type: "final_hold",
+        label: "Finished",
+        order_index: 1,
+        duration: 4,
+        enabled: true,
+        settings: {},
+      },
     ];
     render(<StageTimeline stages={stages} onChange={() => {}} />);
     expect(screen.getByRole("button", { name: /move finished earlier/i })).toBeInTheDocument();

@@ -84,7 +84,7 @@ CONSENT_TYPES = (
 
 
 def _utcnow() -> dt.datetime:
-    return dt.datetime.now(dt.timezone.utc)
+    return dt.datetime.now(dt.UTC)
 
 
 class TimestampMixin:
@@ -112,13 +112,13 @@ class User(Base, TimestampMixin):
     retention_preferences: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
     deleted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
-    projects: Mapped[list["Project"]] = relationship(
+    projects: Mapped[list[Project]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
-    sessions: Mapped[list["UserSession"]] = relationship(
+    sessions: Mapped[list[UserSession]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
-    consents: Mapped[list["ConsentRecord"]] = relationship(
+    consents: Mapped[list[ConsentRecord]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -191,19 +191,17 @@ class Project(Base, TimestampMixin):
     deleted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
     user: Mapped[User] = relationship(back_populates="projects")
-    assets: Mapped[list["Asset"]] = relationship(
+    assets: Mapped[list[Asset]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
-    masks: Mapped[list["Mask"]] = relationship(
+    masks: Mapped[list[Mask]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    jobs: Mapped[list[ProcessingJob]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
-    jobs: Mapped[list["ProcessingJob"]] = relationship(
+    stages: Mapped[list[TimelapseStage]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
-    stages: Mapped[list["TimelapseStage"]] = relationship(
-        back_populates="project", cascade="all, delete-orphan"
-    )
-    exports: Mapped[list["Export"]] = relationship(
+    exports: Mapped[list[Export]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
 

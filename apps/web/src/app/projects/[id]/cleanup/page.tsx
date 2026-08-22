@@ -129,7 +129,9 @@ export default function CleanupEditorPage() {
     if (version === null) return null;
     const result = await previewMask.mutateAsync(version);
     setPreview(result);
-    setProtectedRegions(result.protection.regions.filter((region) => region.kind !== "overlay_candidate"));
+    setProtectedRegions(
+      result.protection.regions.filter((region) => region.kind !== "overlay_candidate"),
+    );
     setStatus(
       result.protection.blocked
         ? "The selection overlaps protected content."
@@ -208,7 +210,9 @@ export default function CleanupEditorPage() {
       <LiveRegion message={status} />
       <div className="flex flex-col gap-4 border-b border-[var(--color-line)] px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <p className="text-xs uppercase tracking-wide text-[var(--color-ink-subtle)]">Cleanup editor</p>
+          <p className="text-xs tracking-wide text-[var(--color-ink-subtle)] uppercase">
+            Cleanup editor
+          </p>
           <h1 className="truncate font-serif text-xl text-[var(--color-ink)]">
             {project.data?.name}
           </h1>
@@ -241,7 +245,12 @@ export default function CleanupEditorPage() {
             <Wand2 aria-hidden="true" />
             Detect overlays
           </Button>
-          <Button variant="secondary" size="sm" loading={previewMask.isPending} onClick={() => void checkMask()}>
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={previewMask.isPending}
+            onClick={() => void checkMask()}
+          >
             Check selection
           </Button>
           <Button
@@ -362,7 +371,11 @@ export default function CleanupEditorPage() {
                   <Badge tone="info">{CLEANUP_MODE_LABELS[preview.suggested_mode]}</Badge> is likely
                   to work better here.
                   <div className="mt-2">
-                    <Button size="sm" variant="secondary" onClick={() => setMode(preview.suggested_mode)}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setMode(preview.suggested_mode)}
+                    >
                       Use it
                     </Button>
                   </div>

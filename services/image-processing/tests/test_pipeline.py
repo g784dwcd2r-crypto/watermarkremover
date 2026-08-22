@@ -5,7 +5,6 @@ from __future__ import annotations
 import cv2
 import numpy as np
 import pytest
-
 from artrestore_imaging import demo
 from artrestore_imaging.errors import (
     JobCancelledError,
@@ -24,7 +23,6 @@ from artrestore_imaging.pipeline import (
     select_backend_name,
 )
 from artrestore_imaging.raster import SafeRaster, encode_raster, load_safe_raster
-
 
 
 def _raster(rgb: np.ndarray, alpha: np.ndarray | None = None) -> SafeRaster:
@@ -105,9 +103,7 @@ def test_thin_line_artwork_keeps_edges_crisp(line_art, mean_abs_error):
     )
 
     # The overlay itself is gone.
-    assert mean_abs_error(result.raster.rgb, line_art, mask) < mean_abs_error(
-        dirty, line_art, mask
-    )
+    assert mean_abs_error(result.raster.rgb, line_art, mask) < mean_abs_error(dirty, line_art, mask)
 
 
 def test_small_authorized_overlay_on_texture(woven_texture, mean_abs_error):
@@ -157,7 +153,9 @@ def test_protected_signature_blocks_processing(painting):
 
 def test_source_pixels_outside_the_mask_are_untouched(flat_background):
     dirty, mask = demo.add_date_stamp(flat_background)
-    result = run_cleanup(_raster(dirty), mask, _options("fast_fill", adjustments=MaskAdjustments(feather=0)))
+    result = run_cleanup(
+        _raster(dirty), mask, _options("fast_fill", adjustments=MaskAdjustments(feather=0))
+    )
 
     grown = cv2.dilate(mask, np.ones((9, 9), np.uint8))
     outside = grown == 0
@@ -296,8 +294,9 @@ def test_difference_map_highlights_the_repair(flat_background):
 
 
 def test_export_keeps_resolution_and_colour_profile(flat_background):
-    from PIL import Image
     import io
+
+    from PIL import Image
 
     profile = b"fake-icc-profile-bytes"
     raster = _raster(flat_background)

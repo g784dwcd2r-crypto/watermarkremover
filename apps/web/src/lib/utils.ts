@@ -11,7 +11,9 @@ export function formatDateTime(value: string | null | undefined): string {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
+    date,
+  );
 }
 
 export function relativeDays(value: string | null | undefined): string {
@@ -23,13 +25,14 @@ export function relativeDays(value: string | null | undefined): string {
   return formatter.format(days, "day");
 }
 
-export const PROJECT_STATUS_TONE: Record<ProjectStatus, "neutral" | "info" | "success" | "danger"> = {
-  draft: "neutral",
-  ready: "info",
-  processing: "info",
-  complete: "success",
-  failed: "danger",
-};
+export const PROJECT_STATUS_TONE: Record<ProjectStatus, "neutral" | "info" | "success" | "danger"> =
+  {
+    draft: "neutral",
+    ready: "info",
+    processing: "info",
+    complete: "success",
+    failed: "danger",
+  };
 
 export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   draft: "Draft",

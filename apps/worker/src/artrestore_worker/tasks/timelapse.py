@@ -67,7 +67,7 @@ MIME_BY_FORMAT = {
 
 
 @celery_app.task(name=TASK_TIMELAPSE_ANALYZE, bind=True, acks_late=True)
-def analyze_artwork_task(self, job_id: str) -> dict:  # noqa: ARG001
+def analyze_artwork_task(self, job_id: str) -> dict:
     """Analyse the artwork and seed an editable stage timeline."""
     settings = get_settings()
     storage = get_storage()
@@ -76,7 +76,7 @@ def analyze_artwork_task(self, job_id: str) -> dict:  # noqa: ARG001
     context = _begin(job_id)
     if context is None:
         return {"status": "unknown_job"}
-    project_id, user_id, parameters = context
+    project_id, _user_id, parameters = context
 
     try:
         reporter.report(0.1, "Loading artwork", force=True)
@@ -124,7 +124,7 @@ def analyze_artwork_task(self, job_id: str) -> dict:  # noqa: ARG001
 
     except (TimelapseError, ImagingError) as exc:
         return _fail(job_id, exc.code, exc.message, getattr(exc, "details", {}))
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.exception("timelapse analysis failed", extra=log_context(job_id=job_id))
         return _fail(job_id, "internal_error", "The artwork could not be analysed.")
 
@@ -135,13 +135,13 @@ def analyze_artwork_task(self, job_id: str) -> dict:  # noqa: ARG001
 
 
 @celery_app.task(name=TASK_TIMELAPSE_PREVIEW, bind=True, acks_late=True)
-def render_preview_task(self, job_id: str) -> dict:  # noqa: ARG001
+def render_preview_task(self, job_id: str) -> dict:
     """A fast, low-resolution look at the current timeline."""
     return _render(job_id, preview=True)
 
 
 @celery_app.task(name=TASK_TIMELAPSE_RENDER, bind=True, acks_late=True)
-def render_timelapse_task(self, job_id: str) -> dict:  # noqa: ARG001
+def render_timelapse_task(self, job_id: str) -> dict:
     """The full-resolution render and its exports."""
     return _render(job_id, preview=False)
 
@@ -213,7 +213,11 @@ def _render(job_id: str, *, preview: bool) -> dict:
                 options=options,
                 plan=renderer.plan,
                 analysis_summary=analysis.summary(),
-                source={"asset_id": source_asset_id, "width": raster.width, "height": raster.height},
+                source={
+                    "asset_id": source_asset_id,
+                    "width": raster.width,
+                    "height": raster.height,
+                },
                 intermediates=[
                     {"index": index, "used_as_keyframe": True}
                     for index in range(len(intermediates))
@@ -260,7 +264,7 @@ def _render(job_id: str, *, preview: bool) -> dict:
         return {"status": "cancelled"}
     except (TimelapseError, ImagingError) as exc:
         return _fail(job_id, exc.code, exc.message, getattr(exc, "details", {}))
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.exception("timelapse render failed", extra=log_context(job_id=job_id))
         return _fail(job_id, "internal_error", "The timelapse could not be rendered.")
 
@@ -292,9 +296,7 @@ def _produce_outputs(
         nonlocal poster_frame
         for index, frame in enumerate(
             renderer.iter_frames(
-                progress=lambda fraction, message: reporter.report(
-                    0.1 + fraction * 0.7, message
-                ),
+                progress=lambda fraction, message: reporter.report(0.1 + fraction * 0.7, message),
                 should_cancel=reporter.should_cancel,
             )
         ):
@@ -342,9 +344,7 @@ def _produce_outputs(
     if gif_wanted and gif_frames:
         reporter.report(0.84, "Building GIF preview", force=True)
         destination = workspace / "timelapse.gif"
-        result = encode_gif(
-            iter(gif_frames), destination, fps=12, max_width=480, source_fps=12
-        )
+        result = encode_gif(iter(gif_frames), destination, fps=12, max_width=480, source_fps=12)
         outputs.append(_output_entry("gif", destination, result))
 
     if poster_wanted and poster_frame is not None:
@@ -374,9 +374,7 @@ def _requested_formats(parameters: dict, preview: bool) -> list[str]:
     """
     if preview:
         return ["mp4"]
-    requested = [
-        name for name in (parameters.get("formats") or ["mp4"]) if name in KNOWN_FORMATS
-    ]
+    requested = [name for name in (parameters.get("formats") or ["mp4"]) if name in KNOWN_FORMATS]
     if not requested:
         requested = ["mp4"]
     return [name for name in KNOWN_FORMATS if name in requested]
@@ -410,16 +408,21 @@ def _store_outputs(
                 "project_json": "json",
             }.get(name, name)
             prefix = "preview" if preview else "timelapse"
-            key = build_object_key(
-                user_id, project_id, "export", f"{prefix}-{name}.{extension}"
-            )
+            key = build_object_key(user_id, project_id, "export", f"{prefix}-{name}.{extension}")
             storage.put_bytes(
-                key, Path(entry["path"]).read_bytes(), MIME_BY_FORMAT.get(name, "application/octet-stream")
+                key,
+                Path(entry["path"]).read_bytes(),
+                MIME_BY_FORMAT.get(name, "application/octet-stream"),
             )
             export = Export(
                 project_id=project_id,
-                format="png" if name == "poster" else ("zip" if name == "frames" else
-                                                       ("json" if name == "project_json" else name)),
+                format=(
+                    "png"
+                    if name == "poster"
+                    else (
+                        "zip" if name == "frames" else ("json" if name == "project_json" else name)
+                    )
+                ),
                 storage_key=key,
                 byte_size=int(entry["byte_size"]),
                 settings={**entry["settings"], "preview": preview, "output": name},

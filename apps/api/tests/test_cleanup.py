@@ -6,12 +6,14 @@ import numpy as np
 import pytest
 
 
-
 def _stamp_box(mask: np.ndarray) -> tuple[int, int, int, int]:
     ys, xs = np.nonzero(mask)
-    return int(xs.min()) - 3, int(ys.min()) - 3, int(xs.max() - xs.min()) + 6, int(
-        ys.max() - ys.min()
-    ) + 6
+    return (
+        int(xs.min()) - 3,
+        int(ys.min()) - 3,
+        int(xs.max() - xs.min()) + 6,
+        int(ys.max() - ys.min()) + 6,
+    )
 
 
 @pytest.fixture
@@ -21,9 +23,7 @@ def cleanup_project(api, demo_images, rect_editor_state):
     api.upload_image(project["id"], demo_images["stamped_png"])
     width, height = demo_images["size"]
     box = _stamp_box(demo_images["stamp_mask"])
-    mask = api.save_mask(
-        project["id"], rect_editor_state(*box, width=width, height=height)
-    )
+    mask = api.save_mask(project["id"], rect_editor_state(*box, width=width, height=height))
     return project, mask
 
 
@@ -165,9 +165,7 @@ def test_cleanup_requires_mask_approval(api, cleanup_project):
 def test_cleanup_without_a_mask_is_rejected(api, demo_images):
     project = api.create_project()
     api.upload_image(project["id"], demo_images["stamped_png"])
-    response = api.post(
-        f"/v1/projects/{project['id']}/cleanup", json={"mask_approved": True}
-    )
+    response = api.post(f"/v1/projects/{project['id']}/cleanup", json={"mask_approved": True})
     assert response.status_code == 422
 
 
@@ -221,7 +219,7 @@ def test_retry_is_only_allowed_for_failed_jobs(api, cleanup_project):
 def test_failed_job_can_be_retried(api, cleanup_project):
     """A failure leaves a retryable job rather than a dead end."""
     from artrestore_api.db import session_scope
-    from artrestore_api.models import Mask, ProcessingJob
+    from artrestore_api.models import ProcessingJob
 
     project, mask = cleanup_project
     job = api.post(
@@ -274,13 +272,9 @@ def test_masking_a_signature_is_refused(api, demo_images, rect_editor_state):
     project = api.create_project(name="Signed artwork")
     api.upload_image(project["id"], demo_images["signed_png"], filename="signed.png")
     x, y, w, h = demo_images["signature_box"]
-    mask = api.save_mask(
-        project["id"], rect_editor_state(x, y, w, h, width=360, height=260)
-    )
+    mask = api.save_mask(project["id"], rect_editor_state(x, y, w, h, width=360, height=260))
 
-    preview = api.post(
-        f"/v1/projects/{project['id']}/masks/{mask['version']}/preview"
-    ).json()
+    preview = api.post(f"/v1/projects/{project['id']}/masks/{mask['version']}/preview").json()
     assert preview["protection"]["blocked"] is True
 
     job = api.post(
@@ -398,8 +392,6 @@ def test_export_download_link_is_short_lived(api, cleanup_project):
         },
     )
     export = api.post(f"/v1/projects/{project['id']}/exports", json={"format": "png"}).json()
-    link = api.get(
-        f"/v1/projects/{project['id']}/exports/{export['id']}/download"
-    ).json()
+    link = api.get(f"/v1/projects/{project['id']}/exports/{export['id']}/download").json()
     assert link["expires_in"] <= 900
     assert "signature=" in link["download_url"]

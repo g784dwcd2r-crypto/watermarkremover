@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 
 def test_register_creates_session_and_consent(api):
     assert api.user["email"] == "artist@example.com"
@@ -121,7 +119,9 @@ def test_password_reset_round_trip(api):
 
     # The old password no longer works, the new one does.
     assert (
-        api.client.post("/v1/auth/login", json={"email": api.email, "password": api.password}).status_code
+        api.client.post(
+            "/v1/auth/login", json={"email": api.email, "password": api.password}
+        ).status_code
         == 401
     )
     assert (
@@ -133,7 +133,9 @@ def test_password_reset_round_trip(api):
 
 
 def test_password_reset_token_is_single_use(api):
-    token = api.client.post("/v1/auth/password-reset", json={"email": api.email}).json()["debug_token"]
+    token = api.client.post("/v1/auth/password-reset", json={"email": api.email}).json()[
+        "debug_token"
+    ]
     first = api.client.post(
         "/v1/auth/password-reset/confirm", json={"token": token, "password": "first-new-password-x"}
     )

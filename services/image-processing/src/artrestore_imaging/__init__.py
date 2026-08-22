@@ -4,6 +4,15 @@ Authorized visible-watermark cleanup: validation, provenance-aware metadata
 handling, mask normalisation, protected-region safeguards and inpainting.
 """
 
+from .detection import (  # noqa: F401
+    DetectionConfig,
+    ProtectionAssessment,
+    Region,
+    assess_mask,
+    detect_overlay_candidates,
+    detect_protected_regions,
+    subtract_protected,
+)
 from .errors import (  # noqa: F401
     CorruptImageError,
     ImageTooLargeError,
@@ -14,15 +23,6 @@ from .errors import (  # noqa: F401
     ProtectedRegionError,
     ProtectedRegionReviewError,
     UnsupportedFormatError,
-)
-from .detection import (  # noqa: F401
-    DetectionConfig,
-    ProtectionAssessment,
-    Region,
-    assess_mask,
-    detect_overlay_candidates,
-    detect_protected_regions,
-    subtract_protected,
 )
 from .masks import (  # noqa: F401
     MaskAdjustments,

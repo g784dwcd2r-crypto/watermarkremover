@@ -31,7 +31,9 @@ class APIError(Exception):
     def to_response(self) -> JSONResponse:
         return JSONResponse(
             status_code=self.status_code,
-            content={"error": {"code": self.code, "message": self.message, "details": self.details}},
+            content={
+                "error": {"code": self.code, "message": self.message, "details": self.details}
+            },
         )
 
 

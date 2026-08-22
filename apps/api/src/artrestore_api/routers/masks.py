@@ -5,11 +5,7 @@ from __future__ import annotations
 import base64
 import logging
 
-from fastapi import APIRouter, status
-from sqlalchemy import func, select
-
 from artrestore_imaging import (
-    CleanupOptions,
     DetectionConfig,
     MaskAdjustments,
     analyse_background,
@@ -27,11 +23,13 @@ from artrestore_imaging import (
     segment_text_overlay,
 )
 from artrestore_imaging.errors import ImagingError
+from fastapi import APIRouter, status
+from sqlalchemy import func, select
 
 from ..config import get_settings
 from ..deps import CSRFProtected, CurrentUser, DbSession, DefaultRateLimit, StorageDep
 from ..errors import APIError, not_found, validation_error
-from ..models import Asset, Mask
+from ..models import Mask
 from ..schemas import (
     DetectOverlaysOut,
     DetectOverlaysRequest,
@@ -97,11 +95,16 @@ def create_mask(
     lets a user retry a cleanup with an earlier selection.
     """
     project = project_service.get_owned_project(db, project_id, user)
-    next_version = int(
-        db.execute(
-            select(func.coalesce(func.max(Mask.version), 0)).where(Mask.project_id == project.id)
-        ).scalar_one()
-    ) + 1
+    next_version = (
+        int(
+            db.execute(
+                select(func.coalesce(func.max(Mask.version), 0)).where(
+                    Mask.project_id == project.id
+                )
+            ).scalar_one()
+        )
+        + 1
+    )
 
     mask = Mask(project_id=project.id, version=next_version, editor_state=payload.editor_state)
     db.add(mask)
@@ -110,7 +113,7 @@ def create_mask(
     if payload.mask_png_base64:
         try:
             raw = base64.b64decode(payload.mask_png_base64, validate=True)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise validation_error("mask_png_base64 is not valid base64.") from exc
         if len(raw) > get_settings().max_upload_bytes:
             raise validation_error("That mask image is too large.")
@@ -171,9 +174,7 @@ def preview_mask(
         provenance=(raster.metadata_summary or {}).get("provenance"),
         candidate_boxes=boxes,
     )
-    assessment = assess_mask(
-        binary, detected, enforcement=settings.protected_region_enforcement
-    )
+    assessment = assess_mask(binary, detected, enforcement=settings.protected_region_enforcement)
     analysis = analyse_background(raster.rgb, binary)
 
     return MaskPreviewOut(
@@ -239,8 +240,10 @@ def segment(
         if not payload.box:
             raise validation_error("A box is required for this selection mode.")
         box = (payload.box[0], payload.box[1], payload.box[2], payload.box[3])
-        result = segment_text_overlay(raster.rgb, box) if payload.mode == "text" else segment_box(
-            raster.rgb, box
+        result = (
+            segment_text_overlay(raster.rgb, box)
+            if payload.mode == "text"
+            else segment_box(raster.rgb, box)
         )
     else:
         if not payload.point:

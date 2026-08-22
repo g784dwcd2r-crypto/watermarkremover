@@ -31,7 +31,7 @@ class MaskAdjustments:
     blur: float = 0.0  # additional blur applied to the mask alpha
 
     @classmethod
-    def from_dict(cls, data: dict | None) -> "MaskAdjustments":
+    def from_dict(cls, data: dict | None) -> MaskAdjustments:
         data = data or {}
         return cls(
             expand=int(_clamp(data.get("expand", 0), -256, 256)),
@@ -87,7 +87,9 @@ def rasterize_editor_state(state: dict, width: int, height: int) -> np.ndarray:
     return (canvas * 255.0).astype(np.uint8)
 
 
-def _render_region(region: dict, width: int, height: int, sx: float, sy: float) -> np.ndarray | None:
+def _render_region(
+    region: dict, width: int, height: int, sx: float, sy: float
+) -> np.ndarray | None:
     kind = str(region.get("type", "")).lower()
     layer = np.zeros((height, width), dtype=np.float32)
 
@@ -95,7 +97,9 @@ def _render_region(region: dict, width: int, height: int, sx: float, sy: float) 
         points = _points(region.get("points"), sx, sy)
         if not points:
             return None
-        radius = max(1, int(round(float(_clamp(region.get("size", 24), 1, 4096)) * max(sx, sy) / 2)))
+        radius = max(
+            1, int(round(float(_clamp(region.get("size", 24), 1, 4096)) * max(sx, sy) / 2))
+        )
         hardness = float(_clamp(region.get("hardness", 0.8), 0.0, 1.0))
         stroke = np.zeros((height, width), dtype=np.uint8)
         if len(points) == 1:
@@ -164,7 +168,7 @@ def decode_mask_png(data: bytes, width: int, height: int) -> np.ndarray:
                 mask = np.array(image.convert("RGBA"), dtype=np.uint8)[:, :, 3]
             else:
                 mask = np.array(image.convert("L"), dtype=np.uint8)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise MaskError(f"The mask image could not be decoded: {exc}") from exc
 
     if mask.shape[0] != height or mask.shape[1] != width:
@@ -210,7 +214,7 @@ def normalize_mask(
 
 def mask_components(binary: np.ndarray, *, min_area: int = 4) -> list[dict]:
     """Split a mask into independent cleanup regions with bounding boxes."""
-    count, labels, stats, centroids = cv2.connectedComponentsWithStats(
+    count, _labels, stats, centroids = cv2.connectedComponentsWithStats(
         (binary > 0).astype(np.uint8), connectivity=8
     )
     components: list[dict] = []

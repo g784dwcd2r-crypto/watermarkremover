@@ -36,7 +36,10 @@ export function Select({
 }) {
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <label htmlFor={id} className={cn("text-sm font-medium text-[var(--color-ink)]", hideLabel && "sr-only")}>
+      <label
+        htmlFor={id}
+        className={cn("text-sm font-medium text-[var(--color-ink)]", hideLabel && "sr-only")}
+      >
         {label}
       </label>
       <SelectPrimitive.Root value={value} onValueChange={onValueChange} disabled={disabled}>
@@ -62,14 +65,16 @@ export function Select({
                   key={option.value}
                   value={option.value}
                   disabled={option.disabled}
-                  className="relative flex cursor-pointer select-none flex-col gap-0.5 rounded-[var(--radius-sm)] px-8 py-2 text-sm data-[highlighted:outline-none] data-[highlighted]:bg-[var(--color-primary-soft)] data-[disabled]:opacity-50"
+                  className="data-[highlighted:outline-none] relative flex cursor-pointer flex-col gap-0.5 rounded-[var(--radius-sm)] px-8 py-2 text-sm select-none data-[disabled]:opacity-50 data-[highlighted]:bg-[var(--color-primary-soft)]"
                 >
-                  <SelectPrimitive.ItemIndicator className="absolute left-2 top-2.5">
+                  <SelectPrimitive.ItemIndicator className="absolute top-2.5 left-2">
                     <Check className="size-4 text-[var(--color-primary)]" aria-hidden="true" />
                   </SelectPrimitive.ItemIndicator>
                   <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
                   {option.description ? (
-                    <span className="text-xs text-[var(--color-ink-muted)]">{option.description}</span>
+                    <span className="text-xs text-[var(--color-ink-muted)]">
+                      {option.description}
+                    </span>
                   ) : null}
                 </SelectPrimitive.Item>
               ))}

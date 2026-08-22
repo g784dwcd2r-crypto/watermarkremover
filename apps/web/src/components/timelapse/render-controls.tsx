@@ -29,7 +29,11 @@ export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
   end_card_disclosure: true,
 };
 
-const FORMAT_OPTIONS: Array<{ value: RenderSettings["formats"][number]; label: string; hint: string }> = [
+const FORMAT_OPTIONS: Array<{
+  value: RenderSettings["formats"][number];
+  label: string;
+  hint: string;
+}> = [
   { value: "mp4", label: "MP4 (H.264)", hint: "Best for social platforms" },
   { value: "webm", label: "WebM (VP9)", hint: "Smaller files for the web" },
   { value: "gif", label: "GIF preview", hint: "Short, low resolution" },
@@ -86,7 +90,9 @@ export function RenderControls({
           max={options?.duration_seconds.max ?? 300}
           step={1}
           onValueChange={(duration_seconds) => onChange({ duration_seconds })}
-          format={(value) => `${Math.floor(value / 60)}:${String(Math.round(value % 60)).padStart(2, "0")}`}
+          format={(value) =>
+            `${Math.floor(value / 60)}:${String(Math.round(value % 60)).padStart(2, "0")}`
+          }
         />
         <Slider
           id="render-hold"
@@ -138,9 +144,9 @@ export function RenderControls({
           label="Transition curve"
           value={settings.transition_curve}
           onValueChange={(transition_curve) => onChange({ transition_curve })}
-          options={(options?.transition_curves ?? ["linear", "ease_in", "ease_out", "ease_in_out"]).map(
-            (curve) => ({ value: curve, label: curve.replace(/_/g, " ") }),
-          )}
+          options={(
+            options?.transition_curves ?? ["linear", "ease_in", "ease_out", "ease_in_out"]
+          ).map((curve) => ({ value: curve, label: curve.replace(/_/g, " ") }))}
         />
         <Slider
           id="render-stroke-speed"
@@ -286,7 +292,9 @@ export function RenderControls({
         <Switch
           id="render-end-card"
           label="Show the end card"
-          description={options?.disclosure.end_card_text ?? "Timelapse reconstructed from finished artwork."}
+          description={
+            options?.disclosure.end_card_text ?? "Timelapse reconstructed from finished artwork."
+          }
           checked={settings.end_card_disclosure}
           onCheckedChange={(end_card_disclosure) => onChange({ end_card_disclosure })}
         />

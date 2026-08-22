@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import io
 
-import pytest
-from PIL import Image
-
 from artrestore_imaging import demo
+from PIL import Image
 
 
 def test_upload_round_trip_records_analysis(api, demo_images):
@@ -52,9 +50,7 @@ def test_completion_records_the_ownership_attestation(api, demo_images):
 def test_completion_without_confirmation_is_rejected(api, demo_images):
     """The attestation is a gate: nothing completes without it."""
     project = api.create_project()
-    _, complete = api.upload_image(
-        project["id"], demo_images["stamped_png"], confirm=False
-    )
+    _, complete = api.upload_image(project["id"], demo_images["stamped_png"], confirm=False)
     assert complete.status_code == 422
     assert complete.json()["error"]["code"] == "validation_error"
 

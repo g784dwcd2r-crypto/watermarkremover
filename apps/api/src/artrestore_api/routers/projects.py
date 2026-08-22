@@ -38,9 +38,9 @@ def _detail(db, project: Project) -> ProjectDetailOut:
     ).scalar_one()
 
     detail = ProjectDetailOut.model_validate(project)
-    detail.assets = [
-        asset for asset in sorted(project.assets, key=lambda item: (item.type, item.order_index))
-    ]  # type: ignore[assignment]
+    detail.assets = sorted(  # type: ignore[assignment]
+        project.assets, key=lambda item: (item.type, item.order_index)
+    )
     detail.latest_mask_version = latest.version if latest else None
     detail.active_job = running  # type: ignore[assignment]
     detail.ownership_confirmed = consent_service.has_consent(
@@ -54,7 +54,9 @@ def _detail(db, project: Project) -> ProjectDetailOut:
     return detail
 
 
-@router.get("", response_model=ProjectListOut, dependencies=[DefaultRateLimit], summary="List projects")
+@router.get(
+    "", response_model=ProjectListOut, dependencies=[DefaultRateLimit], summary="List projects"
+)
 def list_projects(
     user: CurrentUser,
     db: DbSession,
