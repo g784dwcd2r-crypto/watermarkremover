@@ -1,0 +1,78 @@
+@import "tailwindcss";
+@import "@artrestore/config/tailwind-preset.css";
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04";
+    text-rendering: optimizeLegibility;
+  }
+
+  /* A visible focus ring on every interactive element, never removed. */
+  :focus-visible {
+    outline: 2px solid var(--color-primary-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  ::selection {
+    background-color: var(--color-primary-soft);
+    color: var(--color-primary-hover);
+  }
+
+  /* Respect the reduced-motion preference everywhere, including the editor. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  @media (forced-colors: active) {
+    /* Keep mask overlays visible in Windows high-contrast mode. */
+    .mask-overlay {
+      forced-color-adjust: none;
+    }
+  }
+}
+
+@layer components {
+  /* The subtle paper texture is marketing-only; the editor canvas stays clean. */
+  .paper-texture {
+    background-image:
+      radial-gradient(circle at 12% 18%, rgb(0 0 0 / 0.018) 0 1px, transparent 1px),
+      radial-gradient(circle at 68% 72%, rgb(0 0 0 / 0.014) 0 1px, transparent 1px),
+      radial-gradient(circle at 42% 88%, rgb(0 0 0 / 0.012) 0 1px, transparent 1px);
+    background-size: 22px 22px, 31px 31px, 17px 17px;
+  }
+
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+  }
+
+  .skip-link:focus {
+    left: 0.75rem;
+    top: 0.75rem;
+    padding: 0.5rem 0.875rem;
+    background: var(--color-paper-raised);
+    border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-md);
+  }
+}

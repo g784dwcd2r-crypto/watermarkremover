@@ -1,0 +1,5 @@
+@import "@artrestore/ui/styles.css";
+
+/* Tailwind 4 scans these trees for utility classes. */
+@source "../";
+@source "../../../../packages/ui/src";

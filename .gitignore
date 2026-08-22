@@ -44,3 +44,6 @@ models/*.safetensors
 .DS_Store
 .idea/
 .vscode/
+
+# Local dev state (SQLite + filesystem storage)
+.dev-state/
