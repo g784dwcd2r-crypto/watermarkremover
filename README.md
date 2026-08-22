@@ -229,6 +229,11 @@ output format.
 accurately, but an operator must add their legal entity, contact routes and
 jurisdiction-specific terms before publishing them.
 
+**Layer files.** The timelapse tool reads a separate line-art asset and separate
+progress images rather than parsing PSD or ORA layer stacks. That covers the same
+need with formats every tool can export, but it does mean an artist with a
+layered file has to export the layers they want to use.
+
 ---
 
 ## Documentation
