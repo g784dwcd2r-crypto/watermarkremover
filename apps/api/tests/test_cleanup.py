@@ -5,7 +5,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from conftest import rect_editor_state
 
 
 def _stamp_box(mask: np.ndarray) -> tuple[int, int, int, int]:
@@ -16,7 +15,7 @@ def _stamp_box(mask: np.ndarray) -> tuple[int, int, int, int]:
 
 
 @pytest.fixture
-def cleanup_project(api, demo_images):
+def cleanup_project(api, demo_images, rect_editor_state):
     """A project with a stamped source image and a mask over the stamp."""
     project = api.create_project(name="Date stamp removal")
     api.upload_image(project["id"], demo_images["stamped_png"])
@@ -140,7 +139,7 @@ def test_cleanup_actually_changes_the_masked_pixels(api, cleanup_project, demo_i
     assert cleaned.shape == original.shape
 
 
-def test_cleanup_requires_ownership_confirmation(api, demo_images):
+def test_cleanup_requires_ownership_confirmation(api, demo_images, rect_editor_state):
     project = api.create_project()
     # Upload without confirming.
     api.upload_image(project["id"], demo_images["stamped_png"], confirm=False)
@@ -271,7 +270,7 @@ def test_job_events_stream_reports_completion(api, cleanup_project):
 # -- safeguards -------------------------------------------------------------
 
 
-def test_masking_a_signature_is_refused(api, demo_images):
+def test_masking_a_signature_is_refused(api, demo_images, rect_editor_state):
     project = api.create_project(name="Signed artwork")
     api.upload_image(project["id"], demo_images["signed_png"], filename="signed.png")
     x, y, w, h = demo_images["signature_box"]
@@ -294,7 +293,7 @@ def test_masking_a_signature_is_refused(api, demo_images):
     assert "attribution" in final["error_message"]
 
 
-def test_signature_refusal_cannot_be_acknowledged_away(api, demo_images):
+def test_signature_refusal_cannot_be_acknowledged_away(api, demo_images, rect_editor_state):
     project = api.create_project()
     api.upload_image(project["id"], demo_images["signed_png"], filename="signed.png")
     x, y, w, h = demo_images["signature_box"]
@@ -317,7 +316,7 @@ def test_signature_refusal_cannot_be_acknowledged_away(api, demo_images):
     assert final["error_code"] == "protected_region"
 
 
-def test_stock_watermarked_image_is_refused(api, demo_images):
+def test_stock_watermarked_image_is_refused(api, demo_images, rect_editor_state):
     """A tiled licensing overlay stops the run.
 
     At this image size the lattice evidence is graded 'moderate', so the refusal

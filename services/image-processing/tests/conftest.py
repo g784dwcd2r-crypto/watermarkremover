@@ -47,7 +47,7 @@ def jpeg_bytes():
     return _encode
 
 
-def mean_abs_error(a: np.ndarray, b: np.ndarray, mask: np.ndarray | None = None) -> float:
+def _mean_abs_error(a: np.ndarray, b: np.ndarray, mask: np.ndarray | None = None) -> float:
     """Mean absolute pixel error, optionally restricted to a mask."""
     difference = np.abs(a.astype(np.float64) - b.astype(np.float64))
     if mask is not None:
@@ -56,6 +56,16 @@ def mean_abs_error(a: np.ndarray, b: np.ndarray, mask: np.ndarray | None = None)
             return 0.0
         return float(difference[selection].mean())
     return float(difference.mean())
+
+
+@pytest.fixture(scope="session")
+def mean_abs_error():
+    """Exposed as a fixture so no test module has to import ``conftest``.
+
+    Importing conftest by name breaks as soon as two suites in the monorepo are
+    collected in one run, because both files claim the same module name.
+    """
+    return _mean_abs_error
 
 
 def encode(image: Image.Image, fmt: str) -> bytes:

@@ -33,7 +33,7 @@ def _environment(tmp_path_factory):
             "ARS_RATE_LIMIT_ENABLED": "false",
             "ARS_COOKIE_SECURE": "false",
             "ARS_PUBLIC_API_URL": "http://testserver",
-            "ARS_LOG_LEVEL": "CRITICAL",
+            "ARS_LOG_LEVEL": "ERROR",
             "ARS_REDIS_URL": "",
         }
     )
@@ -252,10 +252,32 @@ def demo_images():
     }
 
 
-def rect_editor_state(x, y, w, h, *, width, height, feather=2, expand=1):
+def _assert_job_succeeded(job: dict) -> dict:
+    """Assert a job finished, surfacing the worker's error instead of a dict dump."""
+    if job.get("status") != "succeeded":
+        raise AssertionError(
+            f"job {job.get('job_type')} ended as {job.get('status')}: "
+            f"{job.get('error_code')} - {job.get('error_message')} "
+            f"result={job.get('result')}"
+        )
+    return job
+
+
+def _rect_editor_state(x, y, w, h, *, width, height, feather=2, expand=1):
     return {
         "version": 1,
         "image": {"width": width, "height": height},
         "regions": [{"id": "r1", "type": "rect", "x": x, "y": y, "width": w, "height": h}],
         "adjustments": {"feather": feather, "expand": expand, "blur": 0},
     }
+
+
+@pytest.fixture(scope="session")
+def assert_job_succeeded():
+    """A fixture rather than an import: two suites cannot both own ``conftest``."""
+    return _assert_job_succeeded
+
+
+@pytest.fixture(scope="session")
+def rect_editor_state():
+    return _rect_editor_state

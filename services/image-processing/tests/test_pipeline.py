@@ -25,7 +25,6 @@ from artrestore_imaging.pipeline import (
 )
 from artrestore_imaging.raster import SafeRaster, encode_raster, load_safe_raster
 
-from conftest import mean_abs_error
 
 
 def _raster(rgb: np.ndarray, alpha: np.ndarray | None = None) -> SafeRaster:
@@ -48,7 +47,7 @@ def _options(mode: str, **kwargs) -> CleanupOptions:
 
 
 @pytest.mark.parametrize("mode", CLEANUP_MODES)
-def test_flat_background_overlay_is_removed(flat_background, mode):
+def test_flat_background_overlay_is_removed(flat_background, mode, mean_abs_error):
     dirty, mask = demo.add_date_stamp(flat_background)
     result = run_cleanup(_raster(dirty), mask, _options(mode))
 
@@ -58,7 +57,7 @@ def test_flat_background_overlay_is_removed(flat_background, mode):
 
 
 @pytest.mark.parametrize("mode", ["texture_restore", "art_mode"])
-def test_repeating_texture_is_reconstructed(woven_texture, mode):
+def test_repeating_texture_is_reconstructed(woven_texture, mode, mean_abs_error):
     dirty, mask = demo.add_small_overlay_badge(woven_texture)
     result = run_cleanup(_raster(dirty), mask, _options(mode))
 
@@ -74,7 +73,7 @@ def test_repeating_texture_is_reconstructed(woven_texture, mode):
     assert inside > outside * 0.35, "the fill is flatter than the surrounding weave"
 
 
-def test_painted_illustration_keeps_brush_texture(painting):
+def test_painted_illustration_keeps_brush_texture(painting, mean_abs_error):
     dirty, mask = demo.add_date_stamp(painting, text="PROOF 04", origin=(40, 120))
     result = run_cleanup(_raster(dirty), mask, _options("art_mode"))
 
@@ -87,21 +86,31 @@ def test_painted_illustration_keeps_brush_texture(painting):
     assert float(high_frequency[mask > 0].std()) > 1.0
 
 
-def test_thin_line_artwork_keeps_edges_crisp(line_art):
+def test_thin_line_artwork_keeps_edges_crisp(line_art, mean_abs_error):
+    """Edge-Aware mode must not soften the line work it is not asked to touch."""
     dirty, mask = demo.add_date_stamp(line_art, text="v2", origin=(30, 60))
     result = run_cleanup(_raster(dirty), mask, _options("edge_aware"))
 
-    edges_before = cv2.Canny(line_art, 60, 150)
-    edges_after = cv2.Canny(result.raster.rgb, 60, 150)
-    untouched = mask == 0
-    # Outside the mask the artwork must be pixel-identical.
-    assert np.array_equal(result.raster.rgb[untouched], line_art[untouched]) or mean_abs_error(
-        result.raster.rgb, dirty, (~untouched.astype(bool)).astype(np.uint8)
-    ) >= 0
-    assert edges_after[untouched].sum() == pytest.approx(edges_before[untouched].sum(), rel=0.25)
+    grown = cv2.dilate(mask, np.ones((9, 9), np.uint8))
+    untouched = grown == 0
+
+    # Outside the (grown) mask the artwork is returned bit for bit.
+    assert np.array_equal(result.raster.rgb[untouched], dirty[untouched])
+
+    # And the surrounding line structure keeps its edge density.
+    edges_before = cv2.Canny(line_art, 60, 150).astype(np.int64)
+    edges_after = cv2.Canny(result.raster.rgb, 60, 150).astype(np.int64)
+    assert int(edges_after[untouched].sum()) == pytest.approx(
+        int(edges_before[untouched].sum()), rel=0.05
+    )
+
+    # The overlay itself is gone.
+    assert mean_abs_error(result.raster.rgb, line_art, mask) < mean_abs_error(
+        dirty, line_art, mask
+    )
 
 
-def test_small_authorized_overlay_on_texture(woven_texture):
+def test_small_authorized_overlay_on_texture(woven_texture, mean_abs_error):
     dirty, mask = demo.add_small_overlay_badge(woven_texture)
     result = run_cleanup(_raster(dirty), mask, _options("fast_fill"))
     assert mean_abs_error(result.raster.rgb, woven_texture, mask) < mean_abs_error(
