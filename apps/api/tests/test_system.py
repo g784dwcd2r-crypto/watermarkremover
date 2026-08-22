@@ -113,5 +113,33 @@ def test_production_safety_checks_pass_for_a_sane_configuration():
         secret_key="x" * 64,
         storage_backend="s3",
         s3_access_key_id="AKIAREAL",
+        cookie_domain=".example.com",
     )
     assert settings.check_production_safety() == []
+
+
+def test_production_safety_flags_a_missing_cookie_domain():
+    from artrestore_api.config import Settings
+
+    settings = Settings(
+        environment="production",
+        debug=False,
+        cookie_secure=True,
+        secret_key="x" * 64,
+        storage_backend="s3",
+        s3_access_key_id="AKIAREAL",
+        cookie_domain=None,
+    )
+    problems = settings.check_production_safety()
+    assert any("COOKIE_DOMAIN" in problem for problem in problems)
+
+    settings_with_domain = Settings(
+        environment="production",
+        debug=False,
+        cookie_secure=True,
+        secret_key="x" * 64,
+        storage_backend="s3",
+        s3_access_key_id="AKIAREAL",
+        cookie_domain=".example.com",
+    )
+    assert settings_with_domain.check_production_safety() == []

@@ -18,14 +18,31 @@ import * as React from "react";
 
 import { AppShell, PageHeader } from "@/components/layout/app-shell";
 import { UploadDropzone } from "@/components/common/upload-dropzone";
-import { useAssets, useProject } from "@/lib/queries";
+import { useAssets, useJobs, useProject } from "@/lib/queries";
 import { PROJECT_STATUS_LABEL, PROJECT_STATUS_TONE, formatDate, relativeDays } from "@/lib/utils";
+
+const JOB_LABELS: Record<string, string> = {
+  cleanup: "Cleanup",
+  timelapse_analyze: "Artwork analysis",
+  timelapse_preview: "Preview render",
+  timelapse_render: "Final render",
+  export: "Export",
+};
+
+const JOB_TONES: Record<string, "success" | "danger" | "info" | "neutral"> = {
+  succeeded: "success",
+  failed: "danger",
+  running: "info",
+  queued: "info",
+  cancelled: "neutral",
+};
 
 export default function ProjectPage() {
   const params = useParams<{ id: string }>();
   const projectId = params.id;
   const project = useProject(projectId);
   const assets = useAssets(projectId);
+  const jobs = useJobs(projectId);
 
   if (project.isLoading) {
     return (
@@ -172,6 +189,27 @@ export default function ProjectPage() {
           {detail.project_type === "timelapse" && sources.length > 0 ? (
             <Card>
               <CardHeader>
+                <CardTitle>Optional: your brand mark</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                <p className="text-sm leading-relaxed text-[var(--color-ink-muted)]">
+                  Your own logo or signature graphic, overlaid in the corner of the video if you
+                  choose it in the render settings. A PNG with transparency works best.
+                </p>
+                <UploadDropzone
+                  projectId={projectId}
+                  assetType="brand"
+                  requireOwnership={false}
+                  title="Add a brand mark"
+                  description="Only your own branding."
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {detail.project_type === "timelapse" && sources.length > 0 ? (
+            <Card>
+              <CardHeader>
                 <CardTitle>Optional: music</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
@@ -218,6 +256,30 @@ export default function ProjectPage() {
               )}
             </CardContent>
           </Card>
+
+          {(jobs.data?.items.length ?? 0) > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent activity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="flex flex-col gap-2 text-sm">
+                  {(jobs.data?.items ?? []).slice(0, 5).map((job) => (
+                    <li key={job.id} className="flex items-center justify-between gap-2">
+                      <span className="truncate text-[var(--color-ink-muted)]">
+                        {JOB_LABELS[job.job_type] ?? job.job_type}
+                      </span>
+                      <Badge tone={JOB_TONES[job.status] ?? "neutral"}>
+                        {job.status === "succeeded"
+                          ? "Finished"
+                          : job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card>
             <CardHeader>

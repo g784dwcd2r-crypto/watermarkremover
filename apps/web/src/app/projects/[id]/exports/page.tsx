@@ -10,7 +10,7 @@ import {
   Skeleton,
   formatBytes,
 } from "@artrestore/ui";
-import { Download, FileBox, Trash2 } from "lucide-react";
+import { Download, Eye, FileBox, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import * as React from "react";
@@ -40,16 +40,44 @@ export default function ExportsPage() {
   const remove = useDeleteExport(projectId);
   const [status, setStatus] = React.useState<string | null>(null);
 
+  const [preview, setPreview] = React.useState<{
+    id: string;
+    url: string;
+    kind: "video" | "image";
+  } | null>(null);
+
   const openDownload = (exportId: string) => {
     setStatus(null);
     download.mutate(exportId, {
       onSuccess: (record) => {
-        if (record.download_url) {
-          window.open(record.download_url, "_blank", "noopener,noreferrer");
-          setStatus("Download link opened. Links expire in a few minutes.");
-        }
+        if (!record.download_url) return;
+        // A programmatic anchor click survives popup blockers, which eat
+        // window.open calls that follow an async round-trip.
+        const anchor = document.createElement("a");
+        anchor.href = record.download_url;
+        anchor.rel = "noopener noreferrer";
+        anchor.download = "";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setStatus("Download started. Links expire in a few minutes.");
       },
       onError: () => setStatus("That download link could not be created."),
+    });
+  };
+
+  const openPreview = (exportId: string, format: string) => {
+    setStatus(null);
+    download.mutate(exportId, {
+      onSuccess: (record) => {
+        if (!record.download_url) return;
+        setPreview({
+          id: exportId,
+          url: record.download_url,
+          kind: format === "mp4" || format === "webm" ? "video" : "image",
+        });
+      },
+      onError: () => setStatus("That preview could not be loaded."),
     });
   };
 
@@ -116,6 +144,17 @@ export default function ExportsPage() {
                       ) : null}
                     </div>
                     <div className="flex gap-2">
+                      {["mp4", "webm", "gif", "png", "svg"].includes(record.format) ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label="Preview this export inline"
+                          loading={download.isPending}
+                          onClick={() => openPreview(record.id, record.format)}
+                        >
+                          <Eye aria-hidden="true" />
+                        </Button>
+                      ) : null}
                       <Button
                         size="sm"
                         variant="secondary"
@@ -135,6 +174,28 @@ export default function ExportsPage() {
                         <Trash2 aria-hidden="true" />
                       </Button>
                     </div>
+                    {preview?.id === record.id ? (
+                      <div className="w-full">
+                        {preview.kind === "video" ? (
+                          <video
+                            src={preview.url}
+                            controls
+                            playsInline
+                            className="max-h-[60vh] w-full rounded-[var(--radius-md)] border border-[var(--color-line)] bg-black"
+                          />
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={preview.url}
+                            alt="Export preview"
+                            className="max-h-[60vh] w-full rounded-[var(--radius-md)] border border-[var(--color-line)] object-contain"
+                          />
+                        )}
+                        <p className="mt-1.5 text-xs text-[var(--color-ink-subtle)]">
+                          Preview links expire after a few minutes; reopen if playback stops.
+                        </p>
+                      </div>
+                    ) : null}
                   </CardContent>
                 </Card>
               </li>

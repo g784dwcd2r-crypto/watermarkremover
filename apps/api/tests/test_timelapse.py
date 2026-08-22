@@ -348,3 +348,59 @@ def test_other_user_cannot_render(api, other_api, timelapse_project):
         f"/v1/projects/{timelapse_project['id']}/timelapse/render", json=_render_payload()
     )
     assert response.status_code == 404
+
+
+def test_svg_stroke_export(api, timelapse_project, assert_job_succeeded):
+    """The simulated stroke passes can be exported as SVG paths."""
+    response = api.post(
+        f"/v1/projects/{timelapse_project['id']}/timelapse/render",
+        json=_render_payload(formats=["mp4", "svg"]),
+    )
+    job = api.get(f"/v1/projects/{timelapse_project['id']}/jobs/{response.json()['id']}").json()
+    assert_job_succeeded(job)
+
+    svg_entry = next(entry for entry in job["result"]["exports"] if entry["output"] == "svg")
+    from artrestore_api.db import session_scope
+    from artrestore_api.models import Export
+    from artrestore_api.storage import get_storage
+
+    with session_scope() as session:
+        export = session.get(Export, svg_entry["export_id"])
+        assert export.format == "svg"
+        data = get_storage().get_bytes(export.storage_key)
+
+    document = data.decode("utf-8")
+    assert document.startswith("<?xml")
+    assert "<svg" in document and "<path" in document
+    assert 'id="pass-structure"' in document
+    assert "simulated, not recorded input" in document
+    # The disclosure rides on the Export row like every other output.
+    assert (
+        export.disclosure_metadata["reconstruction_type"]
+        == "AI-assisted reconstructed artwork timelapse"
+    )
+
+
+def test_brand_asset_uploads_and_is_composited(api, timelapse_project, assert_job_succeeded):
+    """A dedicated brand asset can be uploaded and referenced by a render."""
+    from artrestore_imaging import demo
+
+    mark_rgb, mark_alpha = demo.alpha_sticker(120)
+    asset_id, complete = api.upload_image(
+        timelapse_project["id"],
+        demo.to_png(mark_rgb, mark_alpha),
+        filename="brand.png",
+        asset_type="brand",
+        confirm=True,
+    )
+    assert complete.status_code == 200
+
+    assets = api.get(f"/v1/projects/{timelapse_project['id']}/assets?asset_type=brand").json()
+    assert [asset["id"] for asset in assets if asset["type"] == "brand"] == [asset_id]
+
+    response = api.post(
+        f"/v1/projects/{timelapse_project['id']}/timelapse/render",
+        json=_render_payload(brand_watermark_asset_id=asset_id),
+    )
+    job = api.get(f"/v1/projects/{timelapse_project['id']}/jobs/{response.json()['id']}").json()
+    assert_job_succeeded(job)

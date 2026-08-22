@@ -66,6 +66,11 @@ class MagicLinkRequest(BaseModel):
     email: EmailStr
 
 
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(..., max_length=256)
+    new_password: str = Field(..., min_length=12, max_length=256)
+
+
 class MagicLinkConfirm(BaseModel):
     token: str = Field(..., max_length=256)
 
@@ -202,7 +207,7 @@ class UploadInitRequest(BaseModel):
     filename: str = Field(..., min_length=1, max_length=255)
     content_type: str = Field(..., max_length=128)
     byte_size: int = Field(..., gt=0)
-    asset_type: Literal["source", "intermediate", "line_art", "audio"] = "source"
+    asset_type: Literal["source", "intermediate", "line_art", "audio", "brand"] = "source"
 
     @field_validator("asset_type")
     @classmethod
@@ -453,7 +458,7 @@ class TimelapseRenderRequest(BaseModel):
     preset: Literal["square", "portrait_4x5", "vertical_9x16", "landscape_16x9", "source"] = (
         "square"
     )
-    formats: list[Literal["mp4", "webm", "gif", "poster", "frames", "project_json"]] = Field(
+    formats: list[Literal["mp4", "webm", "gif", "poster", "frames", "project_json", "svg"]] = Field(
         default_factory=lambda: ["mp4"]
     )
     seed: int = Field(0, ge=0, le=2**31 - 1)
