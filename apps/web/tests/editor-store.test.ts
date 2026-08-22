@@ -133,3 +133,49 @@ describe("editor store", () => {
     expect(store().past.length).toBeLessThanOrEqual(60);
   });
 });
+
+describe("polygon tool", () => {
+  beforeEach(() => {
+    store().reset();
+    store().setImageSize({ width: 400, height: 300 });
+    store().setTool("polygon");
+  });
+
+  it("places vertices without creating a region yet", () => {
+    store().addPolygonPoint({ x: 10, y: 10 });
+    store().addPolygonPoint({ x: 90, y: 20 });
+    expect(store().polygonPoints).toHaveLength(2);
+    expect(store().regions).toHaveLength(0);
+  });
+
+  it("creates one region when the shape is closed", () => {
+    store().addPolygonPoint({ x: 10, y: 10 });
+    store().addPolygonPoint({ x: 90, y: 20 });
+    store().addPolygonPoint({ x: 50, y: 80 });
+    store().closePolygon();
+
+    expect(store().polygonPoints).toHaveLength(0);
+    expect(store().regions).toHaveLength(1);
+    expect(store().regions[0]).toMatchObject({ type: "polygon", mode: "add" });
+    expect(store().regions[0]?.points).toHaveLength(3);
+    expect(store().canUndo()).toBe(true);
+  });
+
+  it("refuses to close a shape with fewer than three vertices", () => {
+    store().addPolygonPoint({ x: 10, y: 10 });
+    store().addPolygonPoint({ x: 90, y: 20 });
+    store().closePolygon();
+    expect(store().regions).toHaveLength(0);
+    expect(store().polygonPoints).toHaveLength(0);
+  });
+
+  it("discards vertices when cancelled or when the tool changes", () => {
+    store().addPolygonPoint({ x: 10, y: 10 });
+    store().cancelPolygon();
+    expect(store().polygonPoints).toHaveLength(0);
+
+    store().addPolygonPoint({ x: 20, y: 20 });
+    store().setTool("brush");
+    expect(store().polygonPoints).toHaveLength(0);
+  });
+});

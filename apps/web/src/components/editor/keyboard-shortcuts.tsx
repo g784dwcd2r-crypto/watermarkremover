@@ -110,6 +110,7 @@ export function useEditorShortcuts({ onSave, onProcess, onFit }: ShortcutHandler
 export const SHORTCUTS: Array<{ keys: string; action: string }> = [
   { keys: "B / E", action: "Brush / eraser" },
   { keys: "R / L / P", action: "Rectangle, lasso, polygon" },
+  { keys: "Enter / Esc", action: "Close or cancel a polygon" },
   { keys: "H or Space", action: "Pan" },
   { keys: "[ / ]", action: "Smaller / larger brush" },
   { keys: "+ / -", action: "Zoom in / out" },

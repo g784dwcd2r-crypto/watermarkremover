@@ -280,6 +280,13 @@ export default function CleanupEditorPage() {
             />
           ) : null}
 
+          {store.tool === "polygon" ? (
+            <Alert tone="info">
+              Click to place each corner, then press <kbd>Enter</kbd> or double-click to close the
+              shape. <kbd>Esc</kbd> abandons it.
+            </Alert>
+          ) : null}
+
           <MaskCanvas
             imageUrl={imageUrl}
             protectedRegions={protectedRegions}

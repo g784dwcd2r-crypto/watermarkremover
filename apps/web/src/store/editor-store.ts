@@ -50,6 +50,8 @@ export interface EditorState {
   brush: BrushSettings;
   activePoints: MaskPoint[];
   drawing: boolean;
+  /** Vertices placed so far by the polygon tool, between clicks. */
+  polygonPoints: MaskPoint[];
 
   // view
   zoom: number;
@@ -73,6 +75,9 @@ export interface EditorState {
   beginStroke: (point: MaskPoint) => void;
   extendStroke: (point: MaskPoint) => void;
   endStroke: () => void;
+  addPolygonPoint: (point: MaskPoint) => void;
+  closePolygon: () => void;
+  cancelPolygon: () => void;
   addRegion: (region: Omit<MaskRegion, "id">) => void;
   removeRegion: (id: string) => void;
   clearMask: () => void;
@@ -120,6 +125,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   brush: { ...DEFAULT_BRUSH },
   activePoints: [],
   drawing: false,
+  polygonPoints: [],
 
   zoom: 1,
   pan: { x: 0, y: 0 },
@@ -134,7 +140,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   lastSavedVersion: null,
 
   setImageSize: (imageSize) => set({ imageSize }),
-  setTool: (tool) => set({ tool, activePoints: [], drawing: false }),
+  setTool: (tool) => set({ tool, activePoints: [], drawing: false, polygonPoints: [] }),
   setBrush: (patch) => set((state) => ({ brush: { ...state.brush, ...patch } })),
 
   setAdjustments: (patch) =>
@@ -196,6 +202,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       dirty: true,
     }));
   },
+
+  // The polygon tool places vertices with individual clicks rather than a drag,
+  // so it lives outside the stroke cycle entirely.
+  addPolygonPoint: (point) => set((state) => ({ polygonPoints: [...state.polygonPoints, point] })),
+
+  closePolygon: () => {
+    const { polygonPoints } = get();
+    if (polygonPoints.length < 3) {
+      set({ polygonPoints: [] });
+      return;
+    }
+    set((state) => ({
+      past: [...state.past, snapshot(state)].slice(-MAX_HISTORY),
+      future: [],
+      regions: [
+        ...state.regions,
+        { id: newId(), type: "polygon", points: polygonPoints, mode: "add" },
+      ],
+      polygonPoints: [],
+      dirty: true,
+    }));
+  },
+
+  cancelPolygon: () => set({ polygonPoints: [] }),
 
   addRegion: (region) =>
     set((state) => ({
@@ -282,6 +312,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({
       imageSize: state.image,
       regions: state.regions.map((region) => ({ ...region, id: region.id || newId() })),
+      polygonPoints: [],
       adjustments: { ...DEFAULT_ADJUSTMENTS, ...state.adjustments },
       past: [],
       future: [],
@@ -304,6 +335,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       adjustments: { ...DEFAULT_ADJUSTMENTS },
       activePoints: [],
       drawing: false,
+      polygonPoints: [],
       past: [],
       future: [],
       dirty: false,

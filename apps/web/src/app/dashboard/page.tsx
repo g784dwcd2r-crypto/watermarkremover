@@ -15,7 +15,7 @@ import {
   Skeleton,
   formatBytes,
 } from "@artrestore/ui";
-import { Copy, FolderOpen, Trash2 } from "lucide-react";
+import { Copy, FolderOpen, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -27,6 +27,7 @@ import {
   useProjects,
   useSession,
   useStorageUsage,
+  useUpdateProject,
 } from "@/lib/queries";
 import { PROJECT_STATUS_LABEL, PROJECT_STATUS_TONE, formatDate, relativeDays } from "@/lib/utils";
 
@@ -166,7 +167,10 @@ function Stat({ label, value }: { label: string; value: string }) {
 function ProjectCard({ project }: { project: Project }) {
   const duplicate = useDuplicateProject();
   const remove = useDeleteProject();
+  const rename = useUpdateProject(project.id);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [renameOpen, setRenameOpen] = React.useState(false);
+  const [draftName, setDraftName] = React.useState(project.name);
   const editorHref =
     project.project_type === "cleanup"
       ? `/projects/${project.id}/cleanup`
@@ -211,6 +215,43 @@ function ProjectCard({ project }: { project: Project }) {
           <Button asChild size="sm" variant="ghost">
             <Link href={`/projects/${project.id}/exports`}>Exports</Link>
           </Button>
+          <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="ghost" aria-label={`Rename ${project.name}`}>
+                <Pencil aria-hidden="true" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent
+              title="Rename project"
+              footer={
+                <>
+                  <Button variant="secondary" onClick={() => setRenameOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    loading={rename.isPending}
+                    onClick={() =>
+                      rename.mutate(
+                        { name: draftName.trim() || project.name },
+                        { onSuccess: () => setRenameOpen(false) },
+                      )
+                    }
+                  >
+                    Save
+                  </Button>
+                </>
+              }
+            >
+              <label htmlFor={`rename-${project.id}`} className="mb-1.5 block text-sm font-medium">
+                Project name
+              </label>
+              <Input
+                id={`rename-${project.id}`}
+                value={draftName}
+                onChange={(event) => setDraftName(event.target.value)}
+              />
+            </DialogContent>
+          </Dialog>
           <Button
             size="sm"
             variant="ghost"

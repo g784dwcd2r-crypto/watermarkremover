@@ -27,6 +27,8 @@ export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
   audio_start_seconds: 0,
   audio_volume: 0.8,
   end_card_disclosure: true,
+  gif_fps: 12,
+  gif_max_width: 480,
 };
 
 const FORMAT_OPTIONS: Array<{
@@ -104,6 +106,30 @@ export function RenderControls({
           onValueChange={(hold_final_seconds) => onChange({ hold_final_seconds })}
           format={(value) => `${value.toFixed(1)}s`}
         />
+
+        {settings.formats.includes("gif") ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Slider
+              id="render-gif-fps"
+              label="GIF frame rate"
+              value={settings.gif_fps}
+              min={4}
+              max={30}
+              onValueChange={(gif_fps) => onChange({ gif_fps })}
+              format={(value) => `${value} fps`}
+            />
+            <Slider
+              id="render-gif-width"
+              label="GIF width"
+              value={settings.gif_max_width}
+              min={120}
+              max={1080}
+              step={20}
+              onValueChange={(gif_max_width) => onChange({ gif_max_width })}
+              format={(value) => `${value} px`}
+            />
+          </div>
+        ) : null}
 
         <fieldset className="flex flex-col gap-2">
           <legend className="text-sm font-medium text-[var(--color-ink)]">Formats</legend>

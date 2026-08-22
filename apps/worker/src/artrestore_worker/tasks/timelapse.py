@@ -205,6 +205,8 @@ def _render(job_id: str, *, preview: bool) -> dict:
                 audio=audio,
                 reporter=reporter,
                 settings=settings,
+                gif_fps=int(parameters.get("gif_fps", 12)),
+                gif_max_width=int(parameters.get("gif_max_width", 480)),
             )
             project_document = build_project_json(
                 project_name=_project_name(project_id),
@@ -277,6 +279,8 @@ def _produce_outputs(
     audio: AudioTrack | None,
     reporter: ProgressReporter,
     settings,
+    gif_fps: int = 12,
+    gif_max_width: int = 480,
 ) -> list[dict]:
     """Render each requested output.
 
@@ -290,7 +294,7 @@ def _produce_outputs(
     gif_frames: list = []
     poster_frame = None
 
-    gif_step = max(1, int(round(plan.fps / 12.0)))
+    gif_step = max(1, int(round(plan.fps / float(max(1, gif_fps)))))
 
     def instrumented():
         nonlocal poster_frame

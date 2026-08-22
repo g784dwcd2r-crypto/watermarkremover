@@ -74,10 +74,14 @@ export function MaskCanvas({
     pan,
     theme,
     showMask,
+    polygonPoints,
     setImageSize,
     beginStroke,
     extendStroke,
     endStroke,
+    addPolygonPoint,
+    closePolygon,
+    cancelPolygon,
     setPan,
     zoomBy,
     fitToScreen,
@@ -118,7 +122,13 @@ export function MaskCanvas({
   const handlePointerDown = () => {
     if (tool === "pan") return;
     const point = toImageCoords();
-    if (point) beginStroke(point);
+    if (!point) return;
+    // Polygon places one vertex per click; everything else starts a drag.
+    if (tool === "polygon") {
+      addPolygonPoint(point);
+      return;
+    }
+    beginStroke(point);
   };
 
   const handlePointerMove = () => {
@@ -128,9 +138,26 @@ export function MaskCanvas({
   };
 
   const handlePointerUp = () => {
-    if (tool === "pan") return;
+    if (tool === "pan" || tool === "polygon") return;
     if (drawing) endStroke();
   };
+
+  // Enter closes the polygon, Escape abandons it. Double-click also closes, so
+  // the tool is usable with a mouse alone.
+  React.useEffect(() => {
+    if (tool !== "polygon") return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        closePolygon();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        cancelPolygon();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tool, closePolygon, cancelPolygon]);
 
   const handleWheel = (event: Konva.KonvaEventObject<WheelEvent>) => {
     event.evt.preventDefault();
@@ -207,7 +234,7 @@ export function MaskCanvas({
         height: Math.abs(end.y - start.y),
       };
     }
-    if (activePoints.length >= 2) {
+    if (tool === "lasso" && activePoints.length >= 2) {
       return { id: "preview", type: "lasso", points: activePoints };
     }
     return null;
@@ -241,6 +268,8 @@ export function MaskCanvas({
           onTouchStart={handlePointerDown}
           onTouchMove={handlePointerMove}
           onTouchEnd={handlePointerUp}
+          onDblClick={() => tool === "polygon" && closePolygon()}
+          onDblTap={() => tool === "polygon" && closePolygon()}
           onWheel={handleWheel}
         >
           <Layer listening={false}>{image ? <KonvaImage image={image} x={0} y={0} /> : null}</Layer>
@@ -251,6 +280,30 @@ export function MaskCanvas({
                 {regions.map((region) => renderRegion(region, region.id))}
                 {previewRegion ? renderRegion(previewRegion, "preview", true) : null}
               </Group>
+            </Layer>
+          ) : null}
+
+          {polygonPoints.length > 0 ? (
+            <Layer listening={false}>
+              <Line
+                points={regionPoints(polygonPoints)}
+                stroke={MASK_COLOUR}
+                strokeWidth={Math.max(1, 2 / zoom)}
+                dash={[6 / zoom, 4 / zoom]}
+                closed={polygonPoints.length > 2}
+                fill={polygonPoints.length > 2 ? `${MASK_COLOUR}33` : undefined}
+              />
+              {polygonPoints.map((point, index) => (
+                <Circle
+                  key={`vertex-${index}`}
+                  x={point.x}
+                  y={point.y}
+                  radius={Math.max(2, 4 / zoom)}
+                  fill="#ffffff"
+                  stroke={MASK_COLOUR}
+                  strokeWidth={Math.max(1, 1.5 / zoom)}
+                />
+              ))}
             </Layer>
           ) : null}
 

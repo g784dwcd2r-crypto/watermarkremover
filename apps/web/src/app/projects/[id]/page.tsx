@@ -146,6 +146,49 @@ export default function ProjectPage() {
               </CardContent>
             </Card>
           ) : null}
+
+          {detail.project_type === "timelapse" && sources.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Optional: your line art</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                <p className="text-sm leading-relaxed text-[var(--color-ink-muted)]">
+                  If you have the sketch or line-art layer as a separate file — ideally with a
+                  transparent background — upload it here. The sketch and line stages will use your
+                  actual drawing instead of edges detected from the finished piece.
+                </p>
+                <UploadDropzone
+                  projectId={projectId}
+                  assetType="line_art"
+                  requireOwnership={false}
+                  title="Add line art"
+                  description="PNG with transparency works best."
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {detail.project_type === "timelapse" && sources.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Optional: music</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                <p className="text-sm leading-relaxed text-[var(--color-ink-muted)]">
+                  Upload only audio you hold the rights to use. You can trim it and set its volume
+                  in the timelapse editor.
+                </p>
+                <UploadDropzone
+                  projectId={projectId}
+                  assetType="audio"
+                  requireOwnership={false}
+                  title="Add music"
+                  description="MP3, WAV or Ogg."
+                />
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
 
         <aside className="flex flex-col gap-4">

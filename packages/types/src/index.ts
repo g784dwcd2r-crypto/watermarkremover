@@ -360,6 +360,8 @@ export interface TimelapseRenderRequest {
   audio_start_seconds: number;
   audio_volume: number;
   end_card_disclosure: boolean;
+  gif_fps: number;
+  gif_max_width: number;
   idempotency_key?: string | null;
 }
 

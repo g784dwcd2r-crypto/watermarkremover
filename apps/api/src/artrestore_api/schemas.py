@@ -477,6 +477,10 @@ class TimelapseRenderRequest(BaseModel):
             "Enabled by default. The metadata disclosure is written regardless."
         ),
     )
+    gif_fps: int = Field(12, ge=4, le=30, description="Frame rate of the GIF preview.")
+    gif_max_width: int = Field(
+        480, ge=120, le=1080, description="Longest edge of the GIF preview, in pixels."
+    )
     preview: bool = Field(False, description="Render a fast low-resolution preview.")
     idempotency_key: str | None = Field(None, max_length=128)
 
