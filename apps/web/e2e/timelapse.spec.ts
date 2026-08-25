@@ -26,7 +26,9 @@ test.describe("timelapse reconstruction", () => {
     await page.getByRole("link", { name: /open the timelapse editor/i }).click();
     await expect(page).toHaveURL(/\/timelapse$/);
 
-    await expect(page.getByText(/labelled a reconstruction in its file metadata/i)).toBeVisible();
+    await expect(
+      page.getByText(/Every export is labelled a reconstruction in its file metadata/i),
+    ).toBeVisible();
 
     // The metadata disclosure is explicitly described as non-optional.
     await expect(page.getByText(/cannot be turned off/i)).toBeVisible();
