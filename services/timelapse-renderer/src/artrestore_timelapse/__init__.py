@@ -36,6 +36,8 @@ from .presets import (  # noqa: F401
     MIN_DURATION_SECONDS,
     PROCESS_MARKER,
     RECONSTRUCTION_TYPE,
+    SPEED_CHOICES,
+    SPEED_RANGE,
     SUPPORTED_FPS,
     resolve_canvas,
 )

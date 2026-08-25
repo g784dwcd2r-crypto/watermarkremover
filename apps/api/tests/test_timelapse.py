@@ -49,6 +49,51 @@ def test_options_describe_modes_and_disclosure(api, timelapse_project):
     assert body["fps_options"] == [24, 30, 60]
 
 
+def test_options_offer_speeds_and_platform_presets(api, timelapse_project):
+    body = api.get(f"/v1/projects/{timelapse_project['id']}/timelapse/options").json()
+
+    values = [entry["value"] for entry in body["speeds"]]
+    assert 1.0 in values
+    assert values == sorted(values)
+    assert body["speed_range"] == {"min": 0.25, "max": 4.0}
+
+    labels = {preset["key"]: preset["label"] for preset in body["presets"]}
+    assert "Instagram" in labels["square"]
+    assert "TikTok" in labels["vertical_9x16"]
+    assert "YouTube" in labels["landscape_16x9"]
+
+
+def test_drawing_speed_shortens_the_video(api, timelapse_project, assert_job_succeeded):
+    natural = api.post(
+        f"/v1/projects/{timelapse_project['id']}/timelapse/render",
+        json=_render_payload(duration_seconds=12.0, speed=1.0),
+    )
+    quick = api.post(
+        f"/v1/projects/{timelapse_project['id']}/timelapse/render",
+        json=_render_payload(duration_seconds=12.0, speed=2.0),
+    )
+    natural_job = api.get(
+        f"/v1/projects/{timelapse_project['id']}/jobs/{natural.json()['id']}"
+    ).json()
+    quick_job = api.get(f"/v1/projects/{timelapse_project['id']}/jobs/{quick.json()['id']}").json()
+    assert_job_succeeded(natural_job)
+    assert_job_succeeded(quick_job)
+
+    # The same timeline plays in half the time (plus the fixed end card).
+    natural_duration = natural_job["result"]["duration_seconds"]
+    quick_duration = quick_job["result"]["duration_seconds"]
+    assert quick_duration < natural_duration
+    assert quick_duration == pytest.approx(natural_duration / 2, abs=2.5)
+
+
+def test_out_of_range_speed_is_rejected(api, timelapse_project):
+    response = api.post(
+        f"/v1/projects/{timelapse_project['id']}/timelapse/render",
+        json=_render_payload(speed=9.0),
+    )
+    assert response.status_code == 422
+
+
 def test_analysis_creates_an_editable_timeline(api, timelapse_project, assert_job_succeeded):
     response = api.post(
         f"/v1/projects/{timelapse_project['id']}/timelapse/analyze",

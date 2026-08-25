@@ -464,6 +464,9 @@ class TimelapseRenderRequest(BaseModel):
     )
     seed: int = Field(0, ge=0, le=2**31 - 1)
     background_colour: str = Field("#F7F4EF", pattern=r"^#[0-9a-fA-F]{6}$")
+    # Drawing speed: divides the timeline duration at render time, so 2.0
+    # plays the same reconstruction in half the time.
+    speed: float = Field(1.0, ge=0.25, le=4.0)
     stroke_speed: float = Field(1.0, ge=0.1, le=4.0)
     stroke_density: float = Field(1.0, ge=0.1, le=4.0)
     brush_size_min: int = Field(6, ge=1, le=256)

@@ -48,15 +48,19 @@ STAGE_LABELS = {
     "colour_correction": "Final colour correction",
     "stroke_pass": "Stroke pass",
     "real_intermediate": "Artist stage",
+    "hold": "A beat to look it over",
     "final_hold": "Finished artwork",
 }
 
 #: Relative weights used to distribute a requested total duration.
 _TEMPLATES: dict[str, list[tuple[str, float, dict]]] = {
+    # The sketch is always completed in full - construction, then clean lines,
+    # then a breath while the artist looks it over - before any colour is laid.
     "sketch_to_colour": [
-        ("blank_canvas", 0.4, {}),
-        ("construction_sketch", 1.6, {"reveal": "stroke", "jitter": 1.0}),
-        ("refined_lines", 1.4, {"reveal": "stroke"}),
+        ("blank_canvas", 0.35, {}),
+        ("construction_sketch", 1.5, {"reveal": "stroke", "jitter": 1.0}),
+        ("refined_lines", 1.5, {"reveal": "stroke"}),
+        ("hold", 0.35, {}),
         ("base_colours", 2.0, {"reveal": "region"}),
         ("shadows", 1.2, {"reveal": "tonal"}),
         ("highlights", 1.0, {"reveal": "tonal"}),

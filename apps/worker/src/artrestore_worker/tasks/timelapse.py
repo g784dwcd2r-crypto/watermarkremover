@@ -695,7 +695,11 @@ def _load_stages(project_id: str, parameters: dict) -> list[Stage]:
             intermediate_count=_intermediate_count(project_id),
             hold_final_seconds=float(parameters.get("hold_final_seconds", 1.5)),
         )
-    return normalise_plan(stages, total_seconds=float(parameters.get("duration_seconds", 12.0)))
+    # Drawing speed compresses or stretches the whole timeline at render time
+    # without touching the stored stages the user edits.
+    speed = max(0.25, min(4.0, float(parameters.get("speed", 1.0))))
+    total = float(parameters.get("duration_seconds", 12.0)) / speed
+    return normalise_plan(stages, total_seconds=total)
 
 
 def _replace_stages(project_id: str, stages: list[Stage]) -> None:
