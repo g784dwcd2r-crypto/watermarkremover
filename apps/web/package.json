@@ -16,7 +16,7 @@
   "dependencies": {
     "@artrestore/types": "*",
     "@artrestore/ui": "*",
-    "@tanstack/react-query": "^5.66.0",
+    "@tanstack/react-query": "^5.102.0",
     "konva": "^9.3.20",
     "next": "^16.0.0",
     "react": "^19.0.0",
