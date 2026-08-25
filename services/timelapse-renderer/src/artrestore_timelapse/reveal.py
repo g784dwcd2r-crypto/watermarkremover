@@ -13,7 +13,7 @@ import numpy as np
 
 from .analysis import ArtworkAnalysis
 
-REVEAL_KINDS = ("organic", "region", "tonal", "detail", "dissolve", "radial")
+REVEAL_KINDS = ("organic", "region", "tonal", "detail", "dissolve", "radial", "stroke")
 
 
 def _rank_normalise(field: np.ndarray) -> np.ndarray:
@@ -27,6 +27,19 @@ def _rank_normalise(field: np.ndarray) -> np.ndarray:
     ranks = np.empty_like(order, dtype=np.float32)
     ranks[order] = np.linspace(0.0, 1.0, flat.size, dtype=np.float32)
     return ranks.reshape(field.shape)
+
+
+def _coherent_ranks(field: np.ndarray, *, sigma: float) -> np.ndarray:
+    """Rank-normalise while keeping the moving front spatially coherent.
+
+    Ranking alone orders near-tied pixels by noise, so flat regions arrive as
+    per-pixel static. Blurring the rank map merges those ties into patches;
+    ranking again restores the uniform pacing the blur disturbed.
+    """
+    ranks = _rank_normalise(field.astype(np.float32))
+    if sigma > 0:
+        ranks = cv2.GaussianBlur(ranks, (0, 0), sigma)
+    return _rank_normalise(ranks)
 
 
 def _low_frequency_noise(
@@ -51,6 +64,9 @@ def build_reveal_map(
     labels = _resize(analysis.palette_labels.astype(np.float32), width, height, nearest=True)
     saliency = _resize(analysis.saliency, width, height)
 
+    if kind == "stroke":
+        line_art = _resize(analysis.line_art.astype(np.float32), width, height)
+        return _stroke_field(line_art, rng, height, width)
     if kind == "dissolve":
         field = _low_frequency_noise((height, width), rng, max(2.0, min(height, width) / 90.0))
     elif kind == "tonal":
@@ -81,7 +97,72 @@ def build_reveal_map(
             + _low_frequency_noise((height, width), rng, max(3.0, min(height, width) / 60.0)) * 0.60
         )
 
-    return _rank_normalise(field.astype(np.float32))
+    return _coherent_ranks(field, sigma=max(2.0, min(height, width) / 70.0))
+
+
+def _stroke_field(
+    line_art: np.ndarray, rng: np.random.Generator, height: int, width: int
+) -> np.ndarray:
+    """Order line pixels so each connected line draws itself end to end.
+
+    Components start at staggered times (largest structures first, with
+    jitter), and within a component pixels are ordered by their position along
+    a per-component direction, so every line appears as a mark being drawn
+    rather than fading in. Pixels off the lines are identical between the two
+    images a sketch stage blends, so their order is decorative background.
+    """
+    binary = (line_art > 60).astype(np.uint8)
+    count, labels, stats, centroids = cv2.connectedComponentsWithStats(binary, connectivity=8)
+
+    yy, xx = np.mgrid[0:height, 0:width].astype(np.float32)
+    angle = float(rng.uniform(0, np.pi * 2))
+    sweep = xx * np.cos(angle) + yy * np.sin(angle)
+    sweep = (sweep - sweep.min()) / (float(sweep.max() - sweep.min()) or 1.0)
+
+    # Background pixels are identical between the images a sketch stage blends,
+    # so their order is invisible; spreading them across the same 0..1 range as
+    # the lines keeps the visible drawing paced over the whole stage instead of
+    # compressing it into the first few ranks. Blurred noise has a tiny spread,
+    # so normalise it or the sweep would dominate and read as a wipe.
+    noise = _low_frequency_noise((height, width), rng, 10.0)
+    noise = (noise - noise.min()) / (float(noise.max() - noise.min()) or 1.0)
+    field = sweep * 0.25 + noise * 0.75
+
+    if count > 1:
+        areas = stats[1:, cv2.CC_STAT_AREA].astype(np.float32)
+        starts = np.empty(count, dtype=np.float32)
+        starts[0] = 0.0
+        # Bigger structures are laid in earlier, with enough jitter that the
+        # order never reads as strictly mechanical.
+        size_rank = np.argsort(np.argsort(-areas)).astype(np.float32) / max(1.0, count - 2)
+        centroid_sweep = (
+            centroids[1:, 0] * np.cos(angle) + centroids[1:, 1] * np.sin(angle)
+        ).astype(np.float32)
+        spread = centroid_sweep - centroid_sweep.min()
+        spread /= float(spread.max()) or 1.0
+        starts[1:] = (
+            size_rank * 0.45 + spread * 0.35 + rng.random(count - 1).astype(np.float32) * 0.20
+        )
+
+        per_component_angle = rng.uniform(0, np.pi * 2, count).astype(np.float32)
+        cos_a = np.cos(per_component_angle)[labels]
+        sin_a = np.sin(per_component_angle)[labels]
+        along = xx * cos_a + yy * sin_a
+
+        on_lines = labels > 0
+        # Normalise the along-the-line position within each component.
+        flat_labels = labels[on_lines]
+        flat_along = along[on_lines]
+        lows = np.full(count, np.inf, dtype=np.float32)
+        highs = np.full(count, -np.inf, dtype=np.float32)
+        np.minimum.at(lows, flat_labels, flat_along)
+        np.maximum.at(highs, flat_labels, flat_along)
+        span = np.maximum(highs - lows, 1e-3)
+        local = (flat_along - lows[flat_labels]) / span[flat_labels]
+
+        field[on_lines] = starts[flat_labels] + local * 0.22
+
+    return _rank_normalise(field)
 
 
 def _region_field(

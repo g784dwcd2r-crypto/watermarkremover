@@ -1,7 +1,7 @@
 "use client";
 
 import type { CanvasPresetKey, TimelapseOptions, TimelapseRenderRequest } from "@artrestore/types";
-import { Alert, Badge, Select, Slider, Switch } from "@artrestore/ui";
+import { Alert, Select, Slider, Switch } from "@artrestore/ui";
 import * as React from "react";
 
 export type RenderSettings = Omit<TimelapseRenderRequest, "idempotency_key">;
@@ -327,10 +327,9 @@ export function RenderControls({
         />
         <Alert tone="info">
           <p>
-            Every export is labelled{" "}
-            <Badge tone="info">{options?.disclosure.reconstruction_type ?? "reconstruction"}</Badge>{" "}
-            in its file metadata. That is written on every render and cannot be turned off. The
-            visible end card above is on by default and is yours to switch off.
+            Every export is labelled a reconstruction in its file metadata. That note is written on
+            every render and cannot be turned off. The visible end card above is on by default and
+            is yours to switch off.
           </p>
         </Alert>
       </section>

@@ -13,6 +13,7 @@ and the renderer labels it as such.
 from __future__ import annotations
 
 import math
+import zlib
 from dataclasses import dataclass, field
 
 import cv2
@@ -98,7 +99,9 @@ def generate_strokes(
     max_strokes: int = 4000,
 ) -> StrokeField:
     """Build a stroke field for one drawing pass. Deterministic for a seed."""
-    rng = np.random.default_rng(seed + hash(pass_name) % 10_000)
+    # zlib.crc32 rather than hash(): str hashing is salted per process, and a
+    # stroke field must be identical for a given seed on every render.
+    rng = np.random.default_rng(seed + zlib.crc32(pass_name.encode()) % 10_000)
     height, width = analysis.rgb.shape[:2]
     weights = PASS_WEIGHTS.get(pass_name, PASS_WEIGHTS["structure"])
 
@@ -134,9 +137,15 @@ def generate_strokes(
                 brush_max,
             )
         )
-        step_count = int(np.clip(diagonal * 0.03 * scale_factor * rng.uniform(0.6, 1.8), 4, 90))
+        # A mark shorter than it is wide reads as a blob, not a stroke: keep
+        # the walk long enough for at least ~2.5 brush-widths of travel.
+        step_length = 2.4
+        min_steps = int(math.ceil(stroke_width * 2.5 / step_length))
+        step_count = int(
+            np.clip(diagonal * 0.03 * scale_factor * rng.uniform(0.6, 1.8), min_steps, 140)
+        )
         points = _walk(analysis.orientation, start, step_count, rng, width, height)
-        if len(points) < 2:
+        if len(points) < 2 or _path_length(points) < stroke_width * 1.6:
             continue
 
         strokes.append(
@@ -150,6 +159,15 @@ def generate_strokes(
 
     _assign_order(strokes, analysis, pass_name, rng)
     return StrokeField(strokes=strokes)
+
+
+def _path_length(points: list[tuple[int, int]]) -> float:
+    total = 0.0
+    for index in range(1, len(points)):
+        ax, ay = points[index - 1]
+        bx, by = points[index]
+        total += math.hypot(bx - ax, by - ay)
+    return total
 
 
 def _walk(
