@@ -333,6 +333,8 @@ export interface TimelapseOptions {
   fps_options: number[];
   transition_curves: string[];
   duration_seconds: { min: number; max: number };
+  speeds: Array<{ value: number; label: string }>;
+  speed_range: { min: number; max: number };
   disclosure: {
     reconstruction_type: string;
     end_card_text: string;
@@ -349,6 +351,7 @@ export interface TimelapseRenderRequest {
   formats: Array<"mp4" | "webm" | "gif" | "poster" | "frames" | "project_json" | "svg">;
   seed: number;
   background_colour: string;
+  speed: number;
   stroke_speed: number;
   stroke_density: number;
   brush_size_min: number;

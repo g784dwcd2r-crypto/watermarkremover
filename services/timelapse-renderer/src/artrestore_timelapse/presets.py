@@ -44,13 +44,15 @@ class CanvasPreset:
 
 
 CANVAS_PRESETS: dict[str, CanvasPreset] = {
-    "square": CanvasPreset("square", "Square 1:1", 1080, 1080, "Instagram feed"),
-    "portrait_4x5": CanvasPreset("portrait_4x5", "Portrait 4:5", 1080, 1350, "Instagram portrait"),
+    "square": CanvasPreset("square", "Square 1:1 · Instagram", 1080, 1080, "Instagram feed posts"),
+    "portrait_4x5": CanvasPreset(
+        "portrait_4x5", "Portrait 4:5 · Instagram", 1080, 1350, "Instagram portrait posts"
+    ),
     "vertical_9x16": CanvasPreset(
-        "vertical_9x16", "Vertical 9:16", 1080, 1920, "TikTok, Reels, Shorts"
+        "vertical_9x16", "Vertical 9:16 · TikTok / Shorts", 1080, 1920, "TikTok, Reels, Shorts"
     ),
     "landscape_16x9": CanvasPreset(
-        "landscape_16x9", "Landscape 16:9", 1920, 1080, "YouTube and web"
+        "landscape_16x9", "Landscape 16:9 · YouTube", 1920, 1080, "YouTube and the web"
     ),
     "source": CanvasPreset("source", "Source aspect ratio", 0, 0, "Matches the artwork"),
 }
@@ -58,6 +60,20 @@ CANVAS_PRESETS: dict[str, CanvasPreset] = {
 SUPPORTED_FPS = (24, 30, 60)
 MIN_DURATION_SECONDS = 5.0
 MAX_DURATION_SECONDS = 300.0
+
+#: Drawing-speed choices offered by the editor. The multiplier divides the
+#: timeline's duration at render time: 2.0 plays the same reconstruction in
+#: half the time. Any value in SPEED_RANGE is accepted; these are the named
+#: stops the UI shows.
+SPEED_CHOICES = (
+    (0.5, "Relaxed"),
+    (0.75, "Unhurried"),
+    (1.0, "Natural"),
+    (1.5, "Brisk"),
+    (2.0, "Quick"),
+    (3.0, "Rapid"),
+)
+SPEED_RANGE = (0.25, 4.0)
 
 
 def resolve_canvas(

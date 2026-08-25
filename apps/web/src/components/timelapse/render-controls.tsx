@@ -1,7 +1,7 @@
 "use client";
 
 import type { CanvasPresetKey, TimelapseOptions, TimelapseRenderRequest } from "@artrestore/types";
-import { Alert, Badge, Select, Slider, Switch } from "@artrestore/ui";
+import { Alert, Select, Slider, Switch } from "@artrestore/ui";
 import * as React from "react";
 
 export type RenderSettings = Omit<TimelapseRenderRequest, "idempotency_key">;
@@ -14,6 +14,7 @@ export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
   formats: ["mp4", "poster"],
   seed: 1,
   background_colour: "#F7F4EF",
+  speed: 1,
   stroke_speed: 1,
   stroke_density: 1,
   brush_size_min: 6,
@@ -166,6 +167,23 @@ export function RenderControls({
 
       <section className="flex flex-col gap-4">
         <h3 className="text-sm font-semibold text-[var(--color-ink)]">Motion</h3>
+        <Select
+          id="render-speed"
+          label="Drawing speed"
+          value={String(settings.speed)}
+          onValueChange={(value) => onChange({ speed: Number(value) })}
+          options={(
+            options?.speeds ?? [
+              { value: 0.5, label: "Relaxed" },
+              { value: 1, label: "Natural" },
+              { value: 2, label: "Quick" },
+            ]
+          ).map((speed) => ({
+            value: String(speed.value),
+            label: `${speed.label} (${speed.value}×)`,
+          }))}
+          hint="How fast the reconstruction is drawn. Quicker speeds make a shorter video."
+        />
         <Select
           id="render-curve"
           label="Transition curve"
@@ -327,10 +345,9 @@ export function RenderControls({
         />
         <Alert tone="info">
           <p>
-            Every export is labelled{" "}
-            <Badge tone="info">{options?.disclosure.reconstruction_type ?? "reconstruction"}</Badge>{" "}
-            in its file metadata. That is written on every render and cannot be turned off. The
-            visible end card above is on by default and is yours to switch off.
+            Every export is labelled a reconstruction in its file metadata. That note is written on
+            every render and cannot be turned off. The visible end card above is on by default and
+            is yours to switch off.
           </p>
         </Alert>
       </section>

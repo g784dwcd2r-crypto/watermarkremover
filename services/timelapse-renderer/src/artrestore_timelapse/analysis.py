@@ -76,7 +76,7 @@ def analyse_artwork(
     flat_colours = palette[labels].astype(np.uint8)
 
     edges = cv2.Canny(cv2.GaussianBlur(working, (3, 3), 0), 60, 150)
-    line_art = _thin_lines(edges)
+    line_art = _line_art(edges, luminance)
     orientation = _edge_orientation(luminance)
 
     detail_map = _detail_energy(luminance)
@@ -166,6 +166,38 @@ def _thin_lines(edges: np.ndarray) -> np.ndarray:
         edges, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     )
     return cv2.erode(closed, np.ones((2, 2), np.uint8), iterations=1)
+
+
+def _line_art(edges: np.ndarray, luminance: np.ndarray) -> np.ndarray:
+    """Line structure that actually reads as a drawing.
+
+    Canny alone gives one-pixel contours that all but vanish at video size, and
+    it fires on texture noise as readily as on form. This layer thickens the
+    contours, adds a difference-of-gaussians ink for soft interior structure,
+    and removes speck components so the sketch stage shows drawn lines rather
+    than scattered dirt.
+    """
+    thin = _thin_lines(edges)
+    bold = cv2.dilate(thin, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
+
+    # Soft interior structure: dark strokes that survive a small blur.
+    blurred = cv2.GaussianBlur(luminance, (0, 0), 2.5)
+    ink = np.clip((blurred - luminance) * 6.0, 0, 255).astype(np.uint8)
+    ink = cv2.GaussianBlur(ink, (0, 0), 0.8)
+
+    lines = np.maximum(bold, ink)
+
+    # Drop tiny isolated components - they read as dirt, not as marks.
+    binary = (lines > 60).astype(np.uint8)
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(binary, connectivity=8)
+    if count > 1:
+        min_area = max(8, int(lines.size * 2e-5))
+        speck_ids = np.flatnonzero(stats[:, cv2.CC_STAT_AREA] < min_area)
+        speck_ids = speck_ids[speck_ids != 0]
+        if speck_ids.size:
+            lines[np.isin(labels, speck_ids)] = 0
+
+    return cv2.GaussianBlur(lines, (0, 0), 0.6)
 
 
 def _edge_orientation(luminance: np.ndarray) -> np.ndarray:

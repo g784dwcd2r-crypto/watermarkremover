@@ -13,6 +13,8 @@ from artrestore_timelapse import (
     MODE_LABELS,
     MODES,
     RECONSTRUCTION_TYPE,
+    SPEED_CHOICES,
+    SPEED_RANGE,
     STAGE_LABELS,
     SUPPORTED_FPS,
 )
@@ -54,6 +56,8 @@ def timelapse_options() -> dict:
         "fps_options": list(SUPPORTED_FPS),
         "transition_curves": list(EASING_CURVES),
         "duration_seconds": {"min": MIN_DURATION_SECONDS, "max": MAX_DURATION_SECONDS},
+        "speeds": [{"value": value, "label": label} for value, label in SPEED_CHOICES],
+        "speed_range": {"min": SPEED_RANGE[0], "max": SPEED_RANGE[1]},
         "disclosure": {
             "reconstruction_type": RECONSTRUCTION_TYPE,
             "end_card_text": END_CARD_TEXT,

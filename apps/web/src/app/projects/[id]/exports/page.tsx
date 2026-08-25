@@ -129,10 +129,7 @@ export default function ExportsPage() {
                       </p>
                       {reconstruction ? (
                         <p className="mt-1.5 text-xs text-[var(--color-ink-muted)]">
-                          Labelled in file metadata as{" "}
-                          <span className="font-medium text-[var(--color-ink)]">
-                            {reconstruction}
-                          </span>
+                          Carries a reconstruction note in its file metadata
                         </p>
                       ) : disclosure.provenance_preserved ? (
                         <p className="mt-1.5 text-xs text-[var(--color-ink-muted)]">

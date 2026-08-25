@@ -91,6 +91,32 @@ def test_describe_plan_reports_timing_windows():
         assert earlier["ends_at"] == pytest.approx(later["starts_at"], abs=1e-6)
 
 
+def test_sketch_is_completed_in_full_before_any_colour():
+    stages = build_plan("sketch_to_colour", total_seconds=20)
+    types = [stage.stage_type for stage in stages]
+    last_sketch = max(types.index("construction_sketch"), types.index("refined_lines"))
+    first_colour = types.index("base_colours")
+    assert last_sketch < types.index("hold") < first_colour
+
+
+def test_hold_stage_keeps_the_canvas_still(analysis):
+    stages = [
+        Stage(
+            stage_type="base_colours", order_index=0, duration=0.4, settings={"reveal": "region"}
+        ),
+        Stage(stage_type="hold", order_index=1, duration=0.4),
+    ]
+    renderer = TimelapseRenderer(
+        analysis, stages, RenderOptions(fps=10, preset="source", end_card_disclosure=False)
+    )
+    frames = list(renderer.iter_frames())
+    hold_frames = frames[-renderer.plan.frame_counts[-1] :]
+    for frame in hold_frames[1:]:
+        assert np.array_equal(frame, hold_frames[0])
+    # And the held canvas is the completed previous stage, not a blank.
+    assert np.array_equal(hold_frames[0], frames[renderer.plan.frame_counts[0] - 1])
+
+
 # -- reveal maps ------------------------------------------------------------
 
 
