@@ -170,3 +170,53 @@ def test_forged_session_cookie_is_rejected(client):
     client.cookies.set("ars_session", "clearly-not-a-real-token")
     assert client.get("/v1/auth/session").status_code == 401
     client.cookies.clear()
+
+
+def test_password_change_requires_the_current_password(api):
+    response = api.post(
+        "/v1/auth/password",
+        json={"current_password": "wrong-password-here", "new_password": "a-new-long-password-x"},
+    )
+    assert response.status_code == 401
+
+
+def test_password_change_rotates_the_credential_and_other_sessions(app, api):
+    from fastapi.testclient import TestClient
+
+    # A second signed-in session for the same account.
+    other = TestClient(app)
+    other.post("/v1/auth/login", json={"email": api.email, "password": api.password})
+    assert other.get("/v1/auth/session").status_code == 200
+
+    response = api.post(
+        "/v1/auth/password",
+        json={"current_password": api.password, "new_password": "a-brand-new-passphrase-1"},
+    )
+    assert response.status_code == 204
+
+    # The session that made the change survives; the other one is revoked.
+    assert api.get("/v1/auth/session").status_code == 200
+    assert other.get("/v1/auth/session").status_code == 401
+    other.close()
+
+    # Old password dead, new one works.
+    assert (
+        api.client.post(
+            "/v1/auth/login", json={"email": api.email, "password": api.password}
+        ).status_code
+        == 401
+    )
+    assert (
+        api.client.post(
+            "/v1/auth/login", json={"email": api.email, "password": "a-brand-new-passphrase-1"}
+        ).status_code
+        == 200
+    )
+
+
+def test_password_change_rejects_a_weak_replacement(api):
+    response = api.post(
+        "/v1/auth/password",
+        json={"current_password": api.password, "new_password": "short"},
+    )
+    assert response.status_code == 422

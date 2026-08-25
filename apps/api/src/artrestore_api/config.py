@@ -157,6 +157,14 @@ class Settings(BaseSettings):
             )
         if self.s3_access_key_id == "minioadmin":
             problems.append("Default MinIO credentials are still configured.")
+        if not self.cookie_domain:
+            # With host-only cookies, a SPA on app.example.com cannot read the
+            # CSRF cookie set by api.example.com, and every unsafe request 403s.
+            problems.append(
+                "ARS_COOKIE_DOMAIN is unset. When the web app and the API run on "
+                "different subdomains, the CSRF cookie becomes unreadable to the "
+                "app; set the shared parent domain (e.g. .example.com)."
+            )
         return problems
 
 

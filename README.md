@@ -47,7 +47,7 @@ make up             # Postgres, Redis, MinIO, API, worker, beat and web
 ### Everyday commands
 
 ```bash
-make test           # 301 Python tests + 48 web tests
+make test           # 330 Python tests + 52 web tests
 make test-e2e       # 36 Playwright tests (start the API first)
 make lint           # ruff, black, prettier, eslint, tsc
 make format         # autofix all of the above
@@ -154,13 +154,17 @@ so results are reproducible and inspectable.
   curves, stroke speed and density, brush range, seed, background colour, final
   hold, zoom/pan, optional cursor, your own brand mark, and your own music with
   trim and volume.
-- Outputs: MP4 (H.264), WebM (VP9), GIF preview, poster frame, PNG frame
-  archive, and a project JSON with the seed and the exact stage list.
+- Outputs: MP4 (H.264), WebM (VP9), GIF preview (size and frame rate
+  configurable), poster frame, PNG frame archive, an SVG of the simulated
+  stroke paths, and a project JSON with the seed and the exact stage list.
+- Inline playback of the latest render, a dedicated brand-mark asset slot,
+  and optional music with trim and volume.
 
 ### Platform
 
 - Argon2id passwords, hashed session tokens, HTTP-only cookies, double-submit
-  CSRF, per-route rate limiting, password reset and passwordless sign-in.
+  CSRF, per-route rate limiting, password reset, passwordless sign-in, and
+  in-app password change that revokes every other session.
 - Server-side authorization on every project and asset; a foreign project is
   indistinguishable from a missing one.
 - Signed upload and download URLs with short expiry; image bytes never pass

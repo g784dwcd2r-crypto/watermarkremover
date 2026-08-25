@@ -4,7 +4,7 @@ import type { Job } from "@artrestore/types";
 import { Alert, Button, Progress } from "@artrestore/ui";
 import * as React from "react";
 
-import { useCancelJob, useRetryJob } from "@/lib/queries";
+import { useCancelJob, useJob, useRetryJob } from "@/lib/queries";
 import { mergeJobState, useJobProgress } from "@/lib/use-job-progress";
 
 /**
@@ -27,7 +27,13 @@ export function JobProgressPanel({
   onFinished?: (result: Record<string, unknown> | null, status: string) => void;
 }) {
   const stream = useJobProgress(projectId, jobId);
-  const state = mergeJobState(job, stream);
+  // The polling fallback only runs while it is actually needed: the stream is
+  // down (or never opened) and the job has not reached a terminal state. With a
+  // healthy stream this query stays idle.
+  const streamTerminal = ["succeeded", "failed", "cancelled"].includes(stream.status);
+  const needsPolling = Boolean(jobId) && !stream.streaming && !streamTerminal;
+  const { data: polledJob } = useJob(projectId, jobId, needsPolling);
+  const state = mergeJobState(job ?? polledJob, stream);
   const cancel = useCancelJob(projectId);
   const retry = useRetryJob(projectId);
   const notified = React.useRef<string | null>(null);

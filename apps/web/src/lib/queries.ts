@@ -108,6 +108,13 @@ export function useLogout() {
   });
 }
 
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (input: { current_password: string; new_password: string }) =>
+      api.post<void>("/v1/auth/password", input),
+  });
+}
+
 export function useRequestPasswordReset() {
   return useMutation({
     mutationFn: (input: { email: string }) =>
@@ -261,6 +268,10 @@ export function useAssets(projectId: string, assetType?: string) {
     queryKey: [...queryKeys.assets(projectId), assetType ?? "all"],
     queryFn: () => api.get<Asset[]>(`/v1/projects/${projectId}/assets${suffix}`),
     enabled: Boolean(projectId),
+    // Signed download URLs expire after ~5 minutes; editors are long-lived, so
+    // the listing refreshes itself before the links inside it go stale.
+    refetchInterval: 4 * 60_000,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -270,7 +281,7 @@ export function useUploadAsset(projectId: string) {
   return useMutation({
     mutationFn: async (input: {
       file: File;
-      assetType?: "source" | "intermediate" | "line_art" | "audio";
+      assetType?: "source" | "intermediate" | "line_art" | "audio" | "brand";
       ownershipConfirmed: boolean;
     }): Promise<{ assetId: string; analysis: AssetAnalysis | null }> => {
       const init = await api.post<UploadInit>(`/v1/projects/${projectId}/assets/uploads`, {
@@ -366,7 +377,14 @@ export function useJob(projectId: string, jobId: string | null, poll = false) {
     queryKey: queryKeys.job(projectId, jobId ?? ""),
     queryFn: () => api.get<Job>(`/v1/projects/${projectId}/jobs/${jobId}`),
     enabled: Boolean(projectId && jobId),
-    refetchInterval: poll ? 1500 : false,
+    // Polling stops on its own once the job reaches a terminal state, so a
+    // fallback poller cannot keep hitting the API after the work is done.
+    refetchInterval: poll
+      ? (query) => {
+          const status = query.state.data?.status;
+          return status && ["succeeded", "failed", "cancelled"].includes(status) ? false : 1500;
+        }
+      : false,
   });
 }
 

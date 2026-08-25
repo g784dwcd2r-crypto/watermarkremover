@@ -42,6 +42,7 @@ const FORMAT_OPTIONS: Array<{
   { value: "poster", label: "Poster frame", hint: "Thumbnail still" },
   { value: "frames", label: "PNG frames", hint: "A zip for re-editing" },
   { value: "project_json", label: "Project JSON", hint: "Settings, seed and stage list" },
+  { value: "svg", label: "Stroke SVG", hint: "Simulated stroke paths as vectors" },
 ];
 
 export function RenderControls({

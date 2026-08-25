@@ -22,6 +22,7 @@ import * as React from "react";
 import { AppShell, PageHeader } from "@/components/layout/app-shell";
 import { API_BASE_URL, ApiError } from "@/lib/api";
 import {
+  useChangePassword,
   useConsents,
   useDeleteAccount,
   useSession,
@@ -178,6 +179,8 @@ export default function AccountPage() {
           </CardContent>
         </Card>
 
+        <PasswordCard onNotice={setNotice} onError={setError} />
+
         {usage.data ? (
           <Card>
             <CardHeader>
@@ -310,5 +313,87 @@ export default function AccountPage() {
         </Card>
       </div>
     </AppShell>
+  );
+}
+
+function PasswordCard({
+  onNotice,
+  onError,
+}: {
+  onNotice: (message: string) => void;
+  onError: (message: string | null) => void;
+}) {
+  const change = useChangePassword();
+  const [current, setCurrent] = React.useState("");
+  const [next, setNext] = React.useState("");
+  const tooShort = next.length > 0 && next.length < 12;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Change password</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onError(null);
+            change.mutate(
+              { current_password: current, new_password: next },
+              {
+                onSuccess: () => {
+                  setCurrent("");
+                  setNext("");
+                  onNotice("Password changed. Every other signed-in session has been signed out.");
+                },
+                onError: (mutationError) =>
+                  onError(
+                    mutationError instanceof ApiError
+                      ? mutationError.message
+                      : "The password could not be changed.",
+                  ),
+              },
+            );
+          }}
+        >
+          <Field label="Current password" htmlFor="password-current" required>
+            <Input
+              id="password-current"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={current}
+              onChange={(event) => setCurrent(event.target.value)}
+            />
+          </Field>
+          <Field
+            label="New password"
+            htmlFor="password-next"
+            required
+            description="At least 12 characters."
+            error={tooShort ? "Use at least 12 characters." : undefined}
+          >
+            <Input
+              id="password-next"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={12}
+              value={next}
+              onChange={(event) => setNext(event.target.value)}
+            />
+          </Field>
+          <Button
+            type="submit"
+            loading={change.isPending}
+            disabled={!current || next.length < 12}
+            className="self-start"
+          >
+            Change password
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

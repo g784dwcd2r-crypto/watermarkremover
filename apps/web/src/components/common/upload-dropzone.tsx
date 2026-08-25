@@ -28,7 +28,7 @@ export function UploadDropzone({
   description,
 }: {
   projectId: string;
-  assetType?: "source" | "intermediate" | "line_art" | "audio";
+  assetType?: "source" | "intermediate" | "line_art" | "audio" | "brand";
   retentionDays?: number;
   onUploaded?: (assetId: string, analysis: AssetAnalysis | null) => void;
   requireOwnership?: boolean;

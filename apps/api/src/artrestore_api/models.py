@@ -41,6 +41,7 @@ ASSET_TYPES = (
     "intermediate",  # user-supplied progress stages for a timelapse
     "line_art",
     "audio",
+    "brand",  # the user's own brand mark, overlaid on their timelapse if they choose
     "frame",
     "poster",
     "export",
@@ -71,7 +72,7 @@ STAGE_TYPES = (
     "final_hold",
 )
 
-EXPORT_FORMATS = ("png", "jpeg", "webp", "tiff", "mp4", "webm", "gif", "zip", "json")
+EXPORT_FORMATS = ("png", "jpeg", "webp", "tiff", "mp4", "webm", "gif", "zip", "json", "svg")
 
 CONSENT_TYPES = (
     "ownership_confirmation",  # "I own this image or have permission to edit it."

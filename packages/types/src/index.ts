@@ -34,6 +34,7 @@ export type AssetType =
   | "intermediate"
   | "line_art"
   | "audio"
+  | "brand"
   | "frame"
   | "poster"
   | "export";
@@ -344,7 +345,7 @@ export interface TimelapseRenderRequest {
   duration_seconds: number;
   fps: 24 | 30 | 60;
   preset: CanvasPresetKey;
-  formats: Array<"mp4" | "webm" | "gif" | "poster" | "frames" | "project_json">;
+  formats: Array<"mp4" | "webm" | "gif" | "poster" | "frames" | "project_json" | "svg">;
   seed: number;
   background_colour: string;
   stroke_speed: number;

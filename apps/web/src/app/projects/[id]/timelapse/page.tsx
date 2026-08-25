@@ -22,6 +22,7 @@ import { useParams } from "next/navigation";
 import * as React from "react";
 
 import { JobProgressPanel } from "@/components/common/job-progress-panel";
+import { LatestRender } from "@/components/timelapse/latest-render";
 import { AppShell, PageHeader } from "@/components/layout/app-shell";
 import {
   DEFAULT_RENDER_SETTINGS,
@@ -66,6 +67,10 @@ export default function TimelapseEditorPage() {
   const [jobId, setJobId] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
+  const [lastRender, setLastRender] = React.useState<{
+    exports: Array<{ export_id: string; output: string }>;
+    preview: boolean;
+  } | null>(null);
 
   const saved = React.useMemo(
     () => (stages.data ? toEditable(stages.data.items) : []),
@@ -76,6 +81,7 @@ export default function TimelapseEditorPage() {
   const sourcePreview = (assets.data ?? []).find((asset) => asset.type === "source_preview");
   const intermediates = (assets.data ?? []).filter((asset) => asset.type === "intermediate");
   const audioAssets = (assets.data ?? []).filter((asset) => asset.type === "audio");
+  const brandAssets = (assets.data ?? []).filter((asset) => asset.type === "brand");
   const authenticCount = editable.filter(
     (stage) => stage.stage_type === "real_intermediate",
   ).length;
@@ -301,10 +307,23 @@ export default function TimelapseEditorPage() {
             projectId={projectId}
             jobId={jobId}
             label="Reconstructing"
-            onFinished={(_result, jobStatus) =>
-              setStatus(jobStatus === "succeeded" ? "Render finished." : `Render ${jobStatus}.`)
-            }
+            onFinished={(result, jobStatus) => {
+              setStatus(jobStatus === "succeeded" ? "Render finished." : `Render ${jobStatus}.`);
+              const entries = result?.exports as
+                Array<{ export_id: string; output: string }> | undefined;
+              if (jobStatus === "succeeded" && entries?.length) {
+                setLastRender({ exports: entries, preview: Boolean(result?.preview) });
+              }
+            }}
           />
+
+          {lastRender ? (
+            <LatestRender
+              projectId={projectId}
+              exports={lastRender.exports}
+              preview={lastRender.preview}
+            />
+          ) : null}
 
           <Card>
             <CardContent className="pt-5">
@@ -326,9 +345,9 @@ export default function TimelapseEditorPage() {
                       id: asset.id,
                       label: `${asset.mime_type} · ${Math.round(asset.byte_size / 1024)} KB`,
                     }))}
-                    brandAssets={intermediates.map((asset) => ({
+                    brandAssets={brandAssets.map((asset, index) => ({
                       id: asset.id,
-                      label: `Uploaded image ${asset.order_index + 1}`,
+                      label: `Brand mark ${index + 1} (${asset.width}×${asset.height})`,
                     }))}
                   />
                 </TabsContent>

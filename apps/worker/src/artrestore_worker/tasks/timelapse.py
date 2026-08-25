@@ -35,6 +35,7 @@ from artrestore_timelapse import (
     build_plan,
     build_project_json,
     describe_plan,
+    disclosure_metadata,
     dump_project_json,
     encode_gif,
     encode_video,
@@ -58,6 +59,7 @@ MIME_BY_FORMAT = {
     "poster": "image/png",
     "frames": "application/zip",
     "project_json": "application/json",
+    "svg": "image/svg+xml",
 }
 
 
@@ -356,6 +358,20 @@ def _produce_outputs(
         result = write_poster(poster_frame, destination)
         outputs.append(_output_entry("poster", destination, result))
 
+    if "svg" in formats:
+        reporter.report(0.85, "Writing stroke SVG", force=True)
+        destination = workspace / "strokes.svg"
+        _write_stroke_svg(renderer, destination)
+        outputs.append(
+            {
+                "format": "svg",
+                "path": destination,
+                "byte_size": destination.stat().st_size,
+                "disclosure": disclosure_metadata(),
+                "settings": {"kind": "simulated_stroke_paths"},
+            }
+        )
+
     if "frames" in formats:
         reporter.report(0.86, "Writing frame archive", force=True)
         destination = workspace / "frames.zip"
@@ -367,7 +383,7 @@ def _produce_outputs(
     return outputs
 
 
-KNOWN_FORMATS = ("mp4", "webm", "gif", "poster", "frames", "project_json")
+KNOWN_FORMATS = ("mp4", "webm", "gif", "poster", "frames", "project_json", "svg")
 
 
 def _requested_formats(parameters: dict, preview: bool) -> list[str]:
@@ -382,6 +398,47 @@ def _requested_formats(parameters: dict, preview: bool) -> list[str]:
     if not requested:
         requested = ["mp4"]
     return [name for name in KNOWN_FORMATS if name in requested]
+
+
+def _write_stroke_svg(renderer: TimelapseRenderer, destination: Path) -> None:
+    """Export the simulated stroke passes as SVG paths.
+
+    One layer group per pass, each path carrying its width and opacity, and a
+    leading comment stating that the strokes are generated - they are vector
+    material for the user's own motion tooling, not recorded input.
+    """
+    from artrestore_timelapse import DISCLOSURE_LONG, generate_strokes
+
+    analysis = renderer.analysis
+    options = renderer.options
+    width, height = analysis.size
+    groups: list[str] = []
+    for index, pass_name in enumerate(("structure", "mass", "detail")):
+        field = generate_strokes(
+            analysis,
+            pass_name=pass_name,
+            density=options.stroke_density,
+            brush_min=float(options.brush_size_min),
+            brush_max=float(options.brush_size_max),
+            seed=options.seed + index,
+        )
+        paths = "\n".join(
+            f'    <path d="{stroke.to_svg_path()}" stroke-width="{stroke.width:.2f}" '
+            f'stroke-opacity="{stroke.opacity:.2f}" />'
+            for stroke in field.strokes
+            if stroke.points
+        )
+        groups.append(f'  <g id="pass-{pass_name}" data-order="{index}">\n{paths}\n  </g>')
+
+    document = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        f"<!-- {DISCLOSURE_LONG} Stroke paths are simulated, not recorded input. -->\n"
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+        f'viewBox="0 0 {width} {height}" stroke="#2c2c2c" fill="none" stroke-linecap="round">\n'
+        + "\n".join(groups)
+        + "\n</svg>\n"
+    )
+    destination.write_text(document, encoding="utf-8")
 
 
 def _output_entry(name: str, path: Path, result) -> dict:
@@ -410,6 +467,7 @@ def _store_outputs(
                 "poster": "png",
                 "frames": "zip",
                 "project_json": "json",
+                "svg": "svg",
             }.get(name, name)
             prefix = "preview" if preview else "timelapse"
             key = build_object_key(user_id, project_id, "export", f"{prefix}-{name}.{extension}")

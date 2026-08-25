@@ -41,6 +41,7 @@ import {
   useAssets,
   useCreateExport,
   useDetectOverlays,
+  useMasks,
   usePreviewMask,
   useProject,
   useSaveMask,
@@ -66,6 +67,7 @@ export default function CleanupEditorPage() {
 
   const project = useProject(projectId);
   const assets = useAssets(projectId);
+  const masks = useMasks(projectId);
   const saveMask = useSaveMask(projectId);
   const previewMask = usePreviewMask(projectId);
   const detectOverlays = useDetectOverlays(projectId);
@@ -417,6 +419,38 @@ export default function CleanupEditorPage() {
               </Tabs>
             </CardContent>
           </Card>
+
+          {(masks.data?.length ?? 0) > 1 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Mask history</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2">
+                <Select
+                  id="mask-version"
+                  label="Load an earlier version"
+                  hideLabel
+                  value={String(maskVersion ?? masks.data?.[0]?.version ?? "")}
+                  onValueChange={(value) => {
+                    const selected = masks.data?.find((mask) => mask.version === Number(value));
+                    if (!selected) return;
+                    store.loadEditorState(selected.editor_state);
+                    setMaskVersion(selected.version);
+                    setPreview(null);
+                    setStatus(`Loaded mask version ${selected.version} into the editor.`);
+                  }}
+                  options={(masks.data ?? []).map((mask) => ({
+                    value: String(mask.version),
+                    label: `Version ${mask.version}`,
+                    description: `${mask.editor_state.regions?.length ?? 0} region(s)`,
+                  }))}
+                />
+                <p className="text-xs text-[var(--color-ink-muted)]">
+                  Versions are never overwritten; loading one and editing saves a new version.
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
 
           {preview ? (
             <Card>

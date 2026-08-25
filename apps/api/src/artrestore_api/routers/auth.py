@@ -21,6 +21,7 @@ from ..schemas import (
     LoginRequest,
     MagicLinkConfirm,
     MagicLinkRequest,
+    PasswordChangeRequest,
     PasswordResetConfirm,
     PasswordResetRequest,
     RegisterRequest,
@@ -299,6 +300,39 @@ def confirm_magic_link(payload: MagicLinkConfirm, response: Response, db: DbSess
         user.email_verified_at = utcnow()
     db.commit()
     return _start_session(db, response, user)
+
+
+@router.post(
+    "/password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[CSRFProtected, AuthRateLimit],
+    summary="Change the password",
+)
+def change_password(
+    payload: PasswordChangeRequest, request: Request, user: CurrentUser, db: DbSession
+) -> Response:
+    """Change the password of the signed-in account.
+
+    Requires the current password, and revokes every *other* session so a
+    stolen session cannot outlive the credential it was stolen with. The
+    session making the change stays valid.
+    """
+    if not verify_password(payload.current_password, user.password_hash):
+        raise unauthorized("The current password is not correct.")
+    try:
+        user.password_hash = hash_password(payload.new_password)
+    except WeakPasswordError as exc:
+        raise validation_error(str(exc)) from exc
+
+    settings = get_settings()
+    current_token = request.cookies.get(settings.session_cookie_name)
+    current_hash = hash_token(current_token) if current_token else None
+    for session_record in user.sessions:
+        if session_record.revoked_at is None and session_record.token_hash != current_hash:
+            session_record.revoked_at = utcnow()
+    db.commit()
+    logger.info("password changed", extra=log_context(user_id=user.id))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(
