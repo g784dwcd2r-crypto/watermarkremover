@@ -44,6 +44,7 @@ from artrestore_timelapse import (
     write_poster,
 )
 from artrestore_timelapse.errors import RenderCancelledError, TimelapseError
+from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy import select
 
 from ..progress import ProgressReporter
@@ -260,6 +261,13 @@ def _render(job_id: str, *, preview: bool) -> dict:
         _finish(job_id, payload)
         return payload
 
+    except SoftTimeLimitExceeded:
+        return _fail(
+            job_id,
+            "timeout",
+            "The render ran past the time limit and was stopped. Reduce the "
+            "duration, resolution or frame rate and try again.",
+        )
     except RenderCancelledError:
         with session_scope() as session:
             job = session.get(ProcessingJob, job_id)

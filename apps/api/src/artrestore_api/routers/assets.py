@@ -75,6 +75,20 @@ def start_upload(
             details={"max_bytes": max_bytes, "byte_size": payload.byte_size},
         )
 
+    usage = project_service.storage_usage(db, user.id)
+    if usage["total_bytes"] + payload.byte_size > settings.max_user_storage_bytes:
+        raise APIError(
+            "storage_quota_exceeded",
+            "This upload would take your account past its storage limit. Delete "
+            "projects or exports you no longer need, or shorten your retention window.",
+            status_code=413,
+            details={
+                "used_bytes": usage["total_bytes"],
+                "limit_bytes": settings.max_user_storage_bytes,
+                "upload_bytes": payload.byte_size,
+            },
+        )
+
     allowed = (
         settings.allowed_audio_mime_tuple
         if payload.asset_type == "audio"

@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Allow: /authorized-use-policy
+Allow: /privacy
+Allow: /terms
+Disallow: /dashboard
+Disallow: /projects/
+Disallow: /account

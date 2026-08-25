@@ -52,7 +52,12 @@ def update_account(payload: UpdateAccountRequest, user: CurrentUser, db: DbSessi
 
 @router.get("/usage", response_model=StorageUsageOut, summary="Storage usage")
 def storage_usage(user: CurrentUser, db: DbSession) -> StorageUsageOut:
-    return StorageUsageOut(**project_service.storage_usage(db, user.id))
+    from ..config import get_settings
+
+    return StorageUsageOut(
+        **project_service.storage_usage(db, user.id),
+        limit_bytes=get_settings().max_user_storage_bytes,
+    )
 
 
 @router.get("/consents", response_model=list[ConsentOut], summary="List attestations")

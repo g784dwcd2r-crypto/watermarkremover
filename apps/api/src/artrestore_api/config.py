@@ -69,6 +69,26 @@ class Settings(BaseSettings):
     max_audio_bytes: int = 20 * 1024 * 1024
     allowed_audio_mime: str = "audio/mpeg,audio/wav,audio/ogg"
 
+    # -- email (transactional) ----------------------------------------------
+    # Unset host = the logging sender: reset and sign-in links are logged in a
+    # redacted form and, outside production, returned through the API for
+    # development. Set a host to send real mail over SMTP with STARTTLS.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_starttls: bool = True
+
+    # -- abuse limits ---------------------------------------------------------
+    #: Total bytes one account may hold across every project (2 GiB default).
+    max_user_storage_bytes: int = 2 * 1024 * 1024 * 1024
+    #: Queued-plus-running jobs one account may have at once, across projects.
+    max_active_jobs_per_user: int = 5
+    #: Hard wall-clock limit for one worker task; the soft limit fires 60s
+    #: earlier so the job row is failed cleanly instead of the process dying.
+    task_time_limit_seconds: int = 3600
+
     # -- retention / privacy ------------------------------------------------
     default_retention_days: int = 7
     retention_sweep_minutes: int = 60
@@ -157,6 +177,12 @@ class Settings(BaseSettings):
             )
         if self.s3_access_key_id == "minioadmin":
             problems.append("Default MinIO credentials are still configured.")
+        if not self.smtp_host:
+            problems.append(
+                "No SMTP host is configured. Password reset and passwordless sign-in "
+                "cannot deliver email in production; set ARS_SMTP_HOST (and credentials) "
+                "or wire a provider via set_email_sender()."
+            )
         if not self.cookie_domain:
             # With host-only cookies, a SPA on app.example.com cannot read the
             # CSRF cookie set by api.example.com, and every unsafe request 403s.

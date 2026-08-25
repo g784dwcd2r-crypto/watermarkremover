@@ -43,6 +43,26 @@ Set `CELERY_CONCURRENCY` to roughly the core count and scale replicas rather tha
 oversubscribing — oversubscription makes every job slower without finishing more
 of them.
 
+## Email
+
+Set `ARS_SMTP_HOST`, `ARS_SMTP_PORT`, `ARS_SMTP_USERNAME`, `ARS_SMTP_PASSWORD`
+and `ARS_SMTP_FROM` to deliver mail over SMTP with STARTTLS — any transactional
+provider that speaks SMTP works, no vendor SDK involved. Without a host, the
+password-reset and passwordless flows cannot deliver in production, and
+`/readyz` says so.
+
+## Abuse limits
+
+| Setting                        | Default | Meaning                                                                                     |
+| ------------------------------ | ------- | ------------------------------------------------------------------------------------------- |
+| `ARS_MAX_USER_STORAGE_BYTES`   | 2 GiB   | Total bytes one account may hold                                                            |
+| `ARS_MAX_ACTIVE_JOBS_PER_USER` | 5       | Queued + running jobs per account, across projects                                          |
+| `ARS_TASK_TIME_LIMIT_SECONDS`  | 3600    | Hard wall clock per worker task; the soft limit fires 60s earlier and fails the job cleanly |
+
+The API also refuses request bodies larger than the upload budget before
+reading them, so the proxy's `client_max_body_size` is a second line of
+defence rather than the only one.
+
 ## Building
 
 ```bash

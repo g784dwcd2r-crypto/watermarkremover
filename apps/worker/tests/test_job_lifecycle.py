@@ -162,3 +162,52 @@ def test_a_project_without_a_source_fails_cleanly(job):
     assert result["status"] == "failed"
     assert _job(job).status == "failed"
     assert "source" in (_job(job).error_message or "").lower()
+
+
+def test_active_job_cap_holds_across_projects(project):
+    """A user cannot flood the queue by spreading jobs over many projects."""
+    from artrestore_api.config import get_settings
+    from artrestore_api.models import User
+    from artrestore_api.services import projects as project_service
+
+    settings = get_settings()
+    original = settings.max_active_jobs_per_user
+    project_id, user_id = project
+    try:
+        settings.max_active_jobs_per_user = 1
+        with session_scope() as session:
+            first = session.get(Project, project_id)
+            job_service.create_job(session, project=first, job_type="cleanup", parameters={})
+
+            second = project_service.create_project(
+                session,
+                user=session.get(User, user_id),
+                name="Second project",
+                project_type="cleanup",
+            )
+            with pytest.raises(APIError) as excinfo:
+                job_service.create_job(session, project=second, job_type="cleanup", parameters={})
+        assert excinfo.value.code == "too_many_active_jobs"
+        assert excinfo.value.details["limit"] == 1
+    finally:
+        settings.max_active_jobs_per_user = original
+
+
+def test_finished_jobs_do_not_count_against_the_cap(project):
+    from artrestore_api.config import get_settings
+
+    settings = get_settings()
+    original = settings.max_active_jobs_per_user
+    project_id, _ = project
+    try:
+        settings.max_active_jobs_per_user = 1
+        with session_scope() as session:
+            row = session.get(Project, project_id)
+            first, _ = job_service.create_job(
+                session, project=row, job_type="cleanup", parameters={}
+            )
+            job_service.mark_succeeded(session, first, {})
+            # The slot freed up; the next job is accepted.
+            job_service.create_job(session, project=row, job_type="cleanup", parameters={})
+    finally:
+        settings.max_active_jobs_per_user = original

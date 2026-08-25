@@ -114,6 +114,7 @@ def test_production_safety_checks_pass_for_a_sane_configuration():
         storage_backend="s3",
         s3_access_key_id="AKIAREAL",
         cookie_domain=".example.com",
+        smtp_host="mail.example.com",
     )
     assert settings.check_production_safety() == []
 
@@ -141,5 +142,22 @@ def test_production_safety_flags_a_missing_cookie_domain():
         storage_backend="s3",
         s3_access_key_id="AKIAREAL",
         cookie_domain=".example.com",
+        smtp_host="mail.example.com",
     )
     assert settings_with_domain.check_production_safety() == []
+
+
+def test_production_safety_flags_missing_email_delivery():
+    from artrestore_api.config import Settings
+
+    settings = Settings(
+        environment="production",
+        debug=False,
+        cookie_secure=True,
+        secret_key="x" * 64,
+        storage_backend="s3",
+        s3_access_key_id="AKIAREAL",
+        cookie_domain=".example.com",
+        smtp_host="",
+    )
+    assert any("SMTP" in problem for problem in settings.check_production_safety())

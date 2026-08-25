@@ -201,3 +201,61 @@ def test_delete_asset(api, demo_images):
     asset_id, _ = api.upload_image(project["id"], demo_images["stamped_png"])
     assert api.delete(f"/v1/projects/{project['id']}/assets/{asset_id}").status_code == 204
     assert api.get(f"/v1/projects/{project['id']}/assets/{asset_id}").status_code == 404
+
+
+def test_storage_quota_blocks_uploads_past_the_limit(api, demo_images):
+    """One account cannot hold more than its storage allowance."""
+    from artrestore_api.config import get_settings
+
+    settings = get_settings()
+    original = settings.max_user_storage_bytes
+    try:
+        project = api.create_project()
+        api.upload_image(project["id"], demo_images["stamped_png"])
+        used = api.get("/v1/account/usage").json()["total_bytes"]
+        assert used > 0
+
+        # Shrink the quota to just under what a repeat upload would need.
+        settings.max_user_storage_bytes = used + 10
+
+        response = api.post(
+            f"/v1/projects/{project['id']}/assets/uploads",
+            json={
+                "filename": "second.png",
+                "content_type": "image/png",
+                "byte_size": len(demo_images["stamped_png"]),
+                "asset_type": "source",
+            },
+        )
+        assert response.status_code == 413
+        body = response.json()["error"]
+        assert body["code"] == "storage_quota_exceeded"
+        assert body["details"]["limit_bytes"] == used + 10
+    finally:
+        settings.max_user_storage_bytes = original
+
+
+def test_usage_reports_the_storage_limit(api):
+    from artrestore_api.config import get_settings
+
+    body = api.get("/v1/account/usage").json()
+    assert body["limit_bytes"] == get_settings().max_user_storage_bytes
+
+
+def test_oversized_request_bodies_are_refused_before_parsing(api):
+    """The API defends itself against huge bodies; it does not rely on the proxy."""
+    from artrestore_api.config import get_settings
+
+    settings = get_settings()
+    original = settings.max_upload_bytes
+    try:
+        settings.max_upload_bytes = 2048
+        project = api.create_project()
+        response = api.post(
+            f"/v1/projects/{project['id']}/masks",
+            json={"editor_state": {"regions": []}, "mask_png_base64": "A" * 10_000},
+        )
+        assert response.status_code == 413
+        assert response.json()["error"]["code"] == "request_too_large"
+    finally:
+        settings.max_upload_bytes = original

@@ -106,6 +106,7 @@ class DeleteAccountRequest(BaseModel):
 
 class StorageUsageOut(BaseModel):
     total_bytes: int
+    limit_bytes: int = 0
     asset_count: int
     project_count: int
     export_bytes: int

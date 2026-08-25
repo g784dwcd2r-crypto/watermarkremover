@@ -170,6 +170,9 @@ so results are reproducible and inspectable.
 - Signed upload and download URLs with short expiry; image bytes never pass
   through the application server.
 - Jobs with SSE progress, cooperative cancellation, retry and idempotency keys.
+- Per-account storage quota and active-job cap, request-body size limits, and
+  worker task time limits that fail a stuck job cleanly instead of holding a
+  worker slot.
 - Retention of 1, 7 or 30 days, applied to existing work when changed;
   immediate manual deletion; JSON data export; account deletion that erases
   every object.
@@ -215,10 +218,10 @@ solid for overlays on distinguishable backgrounds and weaker on low-contrast
 subjects. `ARS_SEGMENTATION_MODEL_PATH` is read by the availability check but no
 model-backed path is implemented yet.
 
-**Email.** No SMTP provider is bundled. The shipped sender logs a redacted
-record, and outside production it returns the token through the API so the reset
-and passwordless flows are fully testable. Implement `EmailSender` to send real
-mail.
+**Email.** Set `ARS_SMTP_HOST` (plus credentials) and the app delivers real
+mail over SMTP with STARTTLS — any transactional provider that speaks SMTP
+works. Without it, the shipped sender logs a redacted record and, outside
+production, returns the token through the API so the flows stay testable.
 
 **Rate limiting** falls back to an in-process counter when Redis is unreachable,
 which makes limits per-replica rather than global. The readiness probe reports
