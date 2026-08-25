@@ -26,6 +26,7 @@ from artrestore_imaging import (
     run_cleanup,
 )
 from artrestore_imaging.errors import ImagingError, JobCancelledError
+from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy import select
 
 from ..progress import ProgressReporter
@@ -140,6 +141,18 @@ def run_cleanup_task(self, job_id: str) -> dict:
         logger.info("cleanup complete", extra=log_context(job_id=job_id, mode=options.mode))
         return payload
 
+    except SoftTimeLimitExceeded:
+        with session_scope() as session:
+            job = session.get(ProcessingJob, job_id)
+            if job is not None:
+                job_service.mark_failed(
+                    session,
+                    job,
+                    code="timeout",
+                    message="The cleanup ran past the time limit and was stopped. "
+                    "Try a smaller selection or a faster mode.",
+                )
+        return {"status": "failed", "code": "timeout"}
     except JobCancelledError:
         with session_scope() as session:
             job = session.get(ProcessingJob, job_id)

@@ -36,6 +36,11 @@ def get_celery_app() -> Celery:
             timezone="UTC",
             enable_utc=True,
             task_acks_late=True,
+            # A stuck render must not hold a worker slot forever. The soft
+            # limit fires first so the task can fail its job row cleanly; the
+            # hard limit is the backstop that kills the process.
+            task_soft_time_limit=max(60, settings.task_time_limit_seconds - 60),
+            task_time_limit=settings.task_time_limit_seconds,
             worker_prefetch_multiplier=1,
             task_track_started=True,
             broker_connection_retry_on_startup=True,

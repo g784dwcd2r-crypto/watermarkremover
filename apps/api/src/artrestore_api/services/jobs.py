@@ -14,6 +14,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from ..errors import conflict, not_found
 from ..logging_setup import log_context
 from ..models import ProcessingJob, Project
@@ -61,6 +62,25 @@ def create_job(
     existing = find_by_idempotency_key(db, project_id=project.id, key=idempotency_key)
     if existing is not None:
         return existing, False
+
+    # Abuse guard: one account cannot flood the queue across many projects.
+    cap = get_settings().max_active_jobs_per_user
+    if cap > 0:
+        active = db.execute(
+            select(ProcessingJob.id)
+            .join(Project, ProcessingJob.project_id == Project.id)
+            .where(
+                Project.user_id == project.user_id,
+                ProcessingJob.status.in_(("queued", "running")),
+            )
+        ).all()
+        if len(active) >= cap:
+            raise conflict(
+                "too_many_active_jobs",
+                f"You already have {len(active)} jobs queued or running. Wait for "
+                "one to finish (or cancel one) before starting another.",
+                details={"active": len(active), "limit": cap},
+            )
 
     if not allow_concurrent:
         running = (

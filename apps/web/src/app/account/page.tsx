@@ -186,7 +186,38 @@ export default function AccountPage() {
             <CardHeader>
               <CardTitle>Storage</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex flex-col gap-4">
+              {usage.data.limit_bytes > 0 ? (
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-baseline justify-between text-sm">
+                    <span className="font-medium text-[var(--color-ink)]">
+                      {formatBytes(usage.data.total_bytes)} of {formatBytes(usage.data.limit_bytes)}
+                    </span>
+                    <span className="text-xs text-[var(--color-ink-muted)] tabular-nums">
+                      {Math.min(
+                        100,
+                        Math.round((usage.data.total_bytes / usage.data.limit_bytes) * 100),
+                      )}
+                      %
+                    </span>
+                  </div>
+                  <div
+                    className="h-2 w-full overflow-hidden rounded-full bg-[var(--color-paper-sunken)]"
+                    role="progressbar"
+                    aria-label="Storage used"
+                    aria-valuenow={usage.data.total_bytes}
+                    aria-valuemin={0}
+                    aria-valuemax={usage.data.limit_bytes}
+                  >
+                    <div
+                      className="h-full rounded-full bg-[var(--color-primary)]"
+                      style={{
+                        width: `${Math.min(100, (usage.data.total_bytes / usage.data.limit_bytes) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : null}
               <dl className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <dt className="text-xs tracking-wide text-[var(--color-ink-subtle)] uppercase">

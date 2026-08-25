@@ -1,0 +1,30 @@
+# Weekly dependency updates, grouped so a routine week is one PR per ecosystem
+# rather than twenty.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-and-patch:
+        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: pip
+    directories:
+      - /apps/api
+      - /apps/worker
+      - /services/image-processing
+      - /services/timelapse-renderer
+    schedule:
+      interval: weekly
+    groups:
+      pip-minor-and-patch:
+        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

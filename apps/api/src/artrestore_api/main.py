@@ -118,6 +118,39 @@ def create_app() -> FastAPI:
     )
 
     @app.middleware("http")
+    async def limit_request_body(request: Request, call_next):
+        """Refuse oversized bodies before they are read.
+
+        Image bytes travel to object storage over signed URLs, so JSON requests
+        have no reason to be large; the only big body this API accepts is the
+        development storage gateway's PUT. The proxy in front of a deployment
+        enforces the same limit, but the API defends itself as well.
+        """
+        content_length = request.headers.get("content-length")
+        if content_length is not None:
+            limit = max(settings.max_upload_bytes, settings.max_audio_bytes)
+            if not request.url.path.startswith("/v1/storage/"):
+                # JSON endpoints: masks are the largest legitimate payload
+                # (a base64 PNG), well under the upload budget.
+                limit = min(limit, settings.max_upload_bytes)
+            try:
+                declared = int(content_length)
+            except ValueError:
+                declared = 0
+            if declared > limit + 1024:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "error": {
+                            "code": "request_too_large",
+                            "message": "The request body is larger than this endpoint accepts.",
+                            "details": {"limit_bytes": limit},
+                        }
+                    },
+                )
+        return await call_next(request)
+
+    @app.middleware("http")
     async def request_context(request: Request, call_next):
         request_id = request.headers.get("X-Request-Id") or new_request_id()
         token = request_id_var.set(request_id)

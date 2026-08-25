@@ -220,3 +220,35 @@ def test_password_change_rejects_a_weak_replacement(api):
         json={"current_password": api.password, "new_password": "short"},
     )
     assert response.status_code == 422
+
+
+def test_smtp_sender_is_selected_when_configured(api):
+    """With an SMTP host set, tokens are no longer echoed through the API."""
+    from artrestore_api.config import get_settings
+    from artrestore_api.services import email as email_service
+
+    settings = get_settings()
+    sent: list = []
+
+    class Recorder(email_service.SMTPEmailSender):
+        def send(self, message):  # capture instead of opening a socket
+            sent.append(message)
+
+    original_host = settings.smtp_host
+    try:
+        settings.smtp_host = "mail.example.com"
+        email_service.set_email_sender(None)  # rebuild from settings
+        assert isinstance(email_service.get_email_sender(), email_service.SMTPEmailSender)
+
+        email_service.set_email_sender(
+            Recorder(host="mail.example.com", sender="noreply@example.com")
+        )
+        response = api.client.post("/v1/auth/password-reset", json={"email": api.email})
+        assert response.status_code == 200
+        assert "debug_token" not in response.json(), "SMTP deployments must not echo tokens"
+        assert len(sent) == 1
+        assert "reset" in sent[0].subject.lower() or "password" in sent[0].subject.lower()
+        assert api.email == sent[0].to
+    finally:
+        settings.smtp_host = original_host
+        email_service.set_email_sender(None)

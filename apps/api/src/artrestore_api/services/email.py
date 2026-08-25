@@ -32,6 +32,57 @@ class EmailSender(ABC):
     def send(self, message: OutboundEmail) -> None: ...
 
 
+class SMTPEmailSender(EmailSender):
+    """Plain SMTP delivery with STARTTLS.
+
+    Deliberately provider-agnostic: any transactional service that speaks SMTP
+    (Postmark, SES, Mailgun, a relay of your own) works with four environment
+    variables and no vendor SDK.
+    """
+
+    name = "smtp"
+
+    def __init__(
+        self,
+        *,
+        host: str,
+        port: int = 587,
+        username: str = "",
+        password: str = "",
+        sender: str = "",
+        starttls: bool = True,
+        timeout: float = 15.0,
+    ) -> None:
+        self.host = host
+        self.port = port
+        self.username = username
+        self.password = password
+        self.sender = sender or username
+        self.starttls = starttls
+        self.timeout = timeout
+
+    def send(self, message: OutboundEmail) -> None:
+        import smtplib
+        from email.message import EmailMessage
+
+        mail = EmailMessage()
+        mail["From"] = self.sender
+        mail["To"] = message.to
+        mail["Subject"] = message.subject
+        mail.set_content(message.body)
+
+        with smtplib.SMTP(self.host, self.port, timeout=self.timeout) as connection:
+            if self.starttls:
+                connection.starttls()
+            if self.username:
+                connection.login(self.username, self.password)
+            connection.send_message(mail)
+        logger.info(
+            "transactional email sent over smtp",
+            extra=log_context(kind=message.kind, subject=message.subject),
+        )
+
+
 class LoggingEmailSender(EmailSender):
     """Records that an email was sent without recording its contents."""
 
@@ -44,15 +95,30 @@ class LoggingEmailSender(EmailSender):
         )
 
 
-_sender: EmailSender = LoggingEmailSender()
+_sender: EmailSender | None = None
 
 
-def set_email_sender(sender: EmailSender) -> None:
+def set_email_sender(sender: EmailSender | None) -> None:
     global _sender
     _sender = sender
 
 
 def get_email_sender() -> EmailSender:
+    """The active sender: explicit override, SMTP when configured, else logging."""
+    global _sender
+    if _sender is None:
+        settings = get_settings()
+        if settings.smtp_host:
+            _sender = SMTPEmailSender(
+                host=settings.smtp_host,
+                port=settings.smtp_port,
+                username=settings.smtp_username,
+                password=settings.smtp_password,
+                sender=settings.smtp_from,
+                starttls=settings.smtp_starttls,
+            )
+        else:
+            _sender = LoggingEmailSender()
     return _sender
 
 
@@ -68,7 +134,9 @@ def send_password_reset(email: str, token: str) -> str | None:
             kind="password_reset",
         )
     )
-    return None if settings.is_production else token
+    if settings.is_production or isinstance(get_email_sender(), SMTPEmailSender):
+        return None
+    return token
 
 
 def send_magic_link(email: str, token: str) -> str | None:
@@ -82,4 +150,6 @@ def send_magic_link(email: str, token: str) -> str | None:
             kind="magic_link",
         )
     )
-    return None if settings.is_production else token
+    if settings.is_production or isinstance(get_email_sender(), SMTPEmailSender):
+        return None
+    return token

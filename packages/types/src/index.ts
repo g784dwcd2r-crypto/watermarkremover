@@ -74,6 +74,7 @@ export interface SessionResponse {
 
 export interface StorageUsage {
   total_bytes: number;
+  limit_bytes: number;
   asset_count: number;
   project_count: number;
   export_bytes: number;
