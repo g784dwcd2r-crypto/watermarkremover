@@ -510,6 +510,14 @@ class TimelapseRenderer:
             fill_cache: dict = {}
             reveal_map = None
             correction_mask = None
+            serial_reveal = False
+            pacing = {
+                "element_order": str(stage.settings.get("element_order", "meander")),
+                "overlap": float(stage.settings.get("element_overlap", 0.0)),
+                "pause_fraction": float(stage.settings.get("pause_fraction", 0.0)),
+            }
+            if pacing["element_order"] == "importance":
+                pacing["importance"] = self.analysis.subject_mask
             if stage.stage_type == "stroke_pass":
                 stroke_field = generate_strokes(
                     self.analysis,
@@ -525,8 +533,14 @@ class TimelapseRenderer:
                 # Small deliberate strokes placing the identifying details.
                 fill_field = generate_detail_strokes(
                     self.analysis,
-                    density=options.stroke_density,
-                    brush_min=max(2.0, float(options.brush_size_min) * 0.7),
+                    density=options.stroke_density
+                    * float(stage.settings.get("density_scale", 1.0)),
+                    brush_min=max(
+                        2.0,
+                        float(options.brush_size_min)
+                        * 0.7
+                        * float(stage.settings.get("brush_scale", 1.0)),
+                    ),
                     seed=options.seed + stage_index,
                 )
             elif reveal_kind == "stroke_fill":
@@ -542,16 +556,27 @@ class TimelapseRenderer:
                     region_filter = "all"
                 fill_field = generate_fill_strokes(
                     self.analysis,
-                    density=options.stroke_density,
-                    brush_min=float(options.brush_size_min),
-                    brush_max=float(options.brush_size_max),
+                    density=options.stroke_density
+                    * float(stage.settings.get("density_scale", 1.0)),
+                    brush_min=float(options.brush_size_min)
+                    * float(stage.settings.get("brush_scale", 1.0)),
+                    brush_max=float(options.brush_size_max)
+                    * float(stage.settings.get("brush_scale", 1.0)),
                     seed=options.seed + stage_index,
                     region_filter=region_filter,
+                    pause_fraction=float(stage.settings.get("paint_pauses", 0.04)),
+                    late_touchup_fraction=float(stage.settings.get("paint_touchups", 0.0)),
                 )
             elif stage.stage_type == "construction_planning":
-                reveal_map = build_stroke_reveal(self._planning_lines(), rng=stage_rng)
+                reveal_map = build_stroke_reveal(self._planning_lines(), rng=stage_rng, **pacing)
+                serial_reveal = True
             elif stage.stage_type == "ink_lines":
-                reveal_map = build_stroke_reveal(self._ink_lines(), rng=stage_rng)
+                reveal_map = build_stroke_reveal(self._ink_lines(), rng=stage_rng, **pacing)
+                serial_reveal = True
+            elif reveal_kind == "stroke":
+                lines = self.line_art if self.line_art is not None else self.analysis.line_art
+                reveal_map = build_stroke_reveal(lines, rng=stage_rng, **pacing)
+                serial_reveal = True
             elif stage.stage_type not in ("hold", "final_hold"):
                 reveal_map = build_reveal_map(reveal_kind, self.analysis, rng=stage_rng)
 
@@ -593,7 +618,10 @@ class TimelapseRenderer:
                             255,
                         ).astype(np.uint8)
                 elif reveal_map is not None:
-                    canvas = apply_reveal(previous, target, reveal_map, eased)
+                    softness = float(
+                        stage.settings.get("softness", 0.015 if serial_reveal else 0.06)
+                    )
+                    canvas = apply_reveal(previous, target, reveal_map, eased, softness=softness)
                 else:
                     canvas = target
 

@@ -167,6 +167,62 @@ def generate_strokes(
     return StrokeField(strokes=strokes)
 
 
+def _schedule_serial(
+    strokes: list[Stroke],
+    *,
+    rng: np.random.Generator,
+    pause_fraction: float = 0.0,
+    late_indices: set[int] | None = None,
+    late_fraction: float = 0.0,
+    flight: float = 1.15,
+) -> None:
+    """Give every stroke its own sequential window of the stage.
+
+    One mark at a time: stroke k begins when stroke k-1 ends (give or take
+    ``flight``), its window sized by how long the mark takes to make.
+    ``pause_fraction`` reserves quiet beats where the composite key jumps to
+    a new colour group; ``late_fraction`` sends some gap-work strokes to the
+    end of the stage, like a hand going back over earlier areas.
+    """
+    if not strokes:
+        return
+    keys = np.array([stroke.order for stroke in strokes], dtype=np.float64)
+    if late_indices and late_fraction > 0:
+        for index in late_indices:
+            if rng.random() < late_fraction:
+                keys[index] += 10_000.0
+    sequence = np.argsort(keys, kind="stable")
+
+    weights = np.array(
+        [strokes[int(i)].length + 2.0 * strokes[int(i)].width for i in sequence],
+        dtype=np.float64,
+    )
+    weights = np.maximum(weights, 1.0)
+    weights /= weights.sum()
+
+    boundaries = [
+        position
+        for position in range(1, len(sequence))
+        if int(keys[sequence[position]]) != int(keys[sequence[position - 1]])
+    ]
+    pause = float(np.clip(pause_fraction, 0.0, 0.35))
+    gap = pause / len(boundaries) if boundaries else 0.0
+    windows = weights * (1.0 - pause)
+
+    cursor = 0.0
+    boundary_set = set(boundaries)
+    for position, index in enumerate(sequence):
+        if position in boundary_set:
+            cursor += gap
+        stroke = strokes[int(index)]
+        window = float(windows[position])
+        stroke.order = float(min(cursor, 0.999))
+        # Complete the mark within its own window: the next mark starts as
+        # this one lifts off.
+        stroke.speed = float(np.clip(1.0 / (6.0 * max(1e-4, window) * flight), 0.05, 4000.0))
+        cursor += window
+
+
 #: The two passes a painter makes over each colour: a loose block-in with a
 #: big brush, then a tighter fill that closes the gaps.
 _FILL_PASSES = (
@@ -184,6 +240,8 @@ def generate_fill_strokes(
     seed: int = 0,
     max_strokes: int = 4000,
     region_filter: str = "all",
+    pause_fraction: float = 0.04,
+    late_touchup_fraction: float = 0.0,
 ) -> StrokeField:
     """Strokes that block in the base colours the way a painter lays flats.
 
@@ -203,6 +261,7 @@ def generate_fill_strokes(
 
     total_budget = int(np.clip(area / 950.0 * density, 120, max_strokes))
     strokes: list[Stroke] = []
+    gap_indices: set[int] = set()
     flat = analysis.flat_colours
     # Coarse occupancy grid: a painter keeps working a shape until it is
     # actually filled, so gap-filling strokes are added wherever the passes
@@ -326,20 +385,23 @@ def generate_fill_strokes(
                 # loop cannot spin on an unpaintable cell.
                 cv2.circle(occupancy, (start[0] // coarse, start[1] // coarse), 1, 1, -1)
                 continue
-            _make_stroke(
+            if _make_stroke(
                 group,
                 start,
                 field,
                 base_width * 0.7,
                 0.97,
                 position + 0.82 + float(rng.uniform(0.0, 0.12)),
-            )
+            ):
+                gap_indices.add(len(strokes) - 1)
 
-    # Normalise the composite keys onto 0..1 while preserving their order.
-    if strokes:
-        ranks = np.argsort(np.argsort([stroke.order for stroke in strokes]))
-        for stroke, rank in zip(strokes, ranks, strict=True):
-            stroke.order = float(rank) / float(len(strokes))
+    _schedule_serial(
+        strokes,
+        rng=rng,
+        pause_fraction=pause_fraction,
+        late_indices=gap_indices,
+        late_fraction=late_touchup_fraction,
+    )
     return StrokeField(strokes=strokes)
 
 
@@ -398,10 +460,7 @@ def generate_detail_strokes(
             )
         )
 
-    if strokes:
-        ranks = np.argsort(np.argsort([stroke.order for stroke in strokes]))
-        for stroke, rank in zip(strokes, ranks, strict=True):
-            stroke.order = float(rank) / float(len(strokes))
+    _schedule_serial(strokes, rng=rng, pause_fraction=0.03)
     return StrokeField(strokes=strokes)
 
 
