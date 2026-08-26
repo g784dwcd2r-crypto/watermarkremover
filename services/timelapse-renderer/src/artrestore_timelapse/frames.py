@@ -25,7 +25,12 @@ from .presets import (
 )
 from .reveal import apply_reveal, build_reveal_map
 from .stages import Stage
-from .strokes import generate_fill_strokes, generate_strokes, render_strokes
+from .strokes import (
+    generate_fill_strokes,
+    generate_strokes,
+    render_fill_strokes,
+    render_strokes,
+)
 
 ProgressCallback = Callable[[float, str], None]
 
@@ -349,6 +354,8 @@ class TimelapseRenderer:
             stage_rng = np.random.default_rng(options.seed * 7919 + stage_index)
 
             stroke_field = None
+            fill_field = None
+            fill_cache: dict = {}
             reveal_map = None
             if stage.stage_type == "stroke_pass":
                 stroke_field = generate_strokes(
@@ -362,9 +369,9 @@ class TimelapseRenderer:
                     seed=options.seed + stage_index,
                 )
             elif reveal_kind == "stroke_fill":
-                # Colour laid in as directional brush strokes, one palette
-                # region at a time, instead of a soft wash.
-                stroke_field = generate_fill_strokes(
+                # Colour painted in as pigment-loaded brush strokes, one
+                # palette region at a time, instead of a soft wash.
+                fill_field = generate_fill_strokes(
                     self.analysis,
                     density=options.stroke_density,
                     brush_min=float(options.brush_size_min),
@@ -381,7 +388,19 @@ class TimelapseRenderer:
                 raw = (frame_index + 1) / float(frame_count)
                 eased = ease(options.transition_curve, raw)
 
-                if stroke_field is not None:
+                if fill_field is not None:
+                    # Real pigment, no wash: the painted canvas is allowed to
+                    # stay hand-made, and the next stage refines it the way a
+                    # painter works over their own flats.
+                    canvas = render_fill_strokes(
+                        previous,
+                        target,
+                        fill_field,
+                        eased * options.stroke_speed,
+                        cache=fill_cache,
+                        seed=options.seed + stage_index,
+                    )
+                elif stroke_field is not None:
                     canvas = render_strokes(
                         previous, target, stroke_field, eased * options.stroke_speed
                     )
@@ -414,7 +433,10 @@ class TimelapseRenderer:
                         f"({emitted}/{total} frames)",
                     )
 
-            previous = target
+            # A painted stage hands its actual canvas to the next stage - the
+            # brushwork stays visible and is refined, not wiped to a clean
+            # target the viewer never saw being made.
+            previous = canvas if fill_field is not None and frame_count > 0 else target
 
         for index in range(self.plan.end_card_frames):
             frame = self._present(previous, 1.0)

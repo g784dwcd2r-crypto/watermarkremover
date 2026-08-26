@@ -31,6 +31,9 @@ class Stroke:
     opacity: float
     speed: float
     order: float = 0.0  # 0..1 position in the drawing sequence
+    #: Paint colour for fill strokes. None = the stroke reveals the target
+    #: image instead of carrying its own pigment.
+    colour: tuple[int, int, int] | None = None
 
     @property
     def length(self) -> float:
@@ -42,13 +45,16 @@ class Stroke:
         return total
 
     def to_dict(self) -> dict:
-        return {
+        payload = {
             "points": self.points,
             "width": round(self.width, 2),
             "opacity": round(self.opacity, 3),
             "speed": round(self.speed, 3),
             "order": round(self.order, 5),
         }
+        if self.colour is not None:
+            payload["colour"] = list(self.colour)
+        return payload
 
     def to_svg_path(self) -> str:
         """An SVG path for the optional vector export of a stroke pass."""
@@ -161,6 +167,14 @@ def generate_strokes(
     return StrokeField(strokes=strokes)
 
 
+#: The two passes a painter makes over each colour: a loose block-in with a
+#: big brush, then a tighter fill that closes the gaps.
+_FILL_PASSES = (
+    {"brush_scale": 1.5, "share": 0.55, "opacity": 0.8},
+    {"brush_scale": 0.85, "share": 0.45, "opacity": 0.92},
+)
+
+
 def generate_fill_strokes(
     analysis: ArtworkAnalysis,
     *,
@@ -170,13 +184,13 @@ def generate_fill_strokes(
     seed: int = 0,
     max_strokes: int = 4000,
 ) -> StrokeField:
-    """Strokes that block in the base colours, one colour region at a time.
+    """Strokes that block in the base colours the way a painter lays flats.
 
-    This is how a painter lays in flats: pick a colour, fill its shapes with
-    directional strokes, move to the next. Each palette region gets its own
-    brush angle (the region's long axis), strokes are clipped to the region so
-    colour never bleeds across an edge, and the drawing order runs largest
-    colour group to smallest with a row-by-row sweep inside each group.
+    One colour at a time, two passes per colour (a loose block-in, then a
+    fill), strokes following a direction field that hugs each shape's
+    contours near its edges and relaxes to the shape's long axis inside,
+    and each stroke loaded with its own slightly-varied pigment so the
+    colour builds up instead of appearing flat.
     """
     rng = np.random.default_rng(seed + 4241)
     height, width = analysis.rgb.shape[:2]
@@ -186,8 +200,50 @@ def generate_fill_strokes(
     group_count = int(labels.max()) + 1
     area = height * width
 
-    total_budget = int(np.clip(area / 1400.0 * density, 80, max_strokes))
+    total_budget = int(np.clip(area / 950.0 * density, 120, max_strokes))
     strokes: list[Stroke] = []
+    flat = analysis.flat_colours
+    # Coarse occupancy grid: a painter keeps working a shape until it is
+    # actually filled, so gap-filling strokes are added wherever the passes
+    # left bare canvas.
+    coarse = 3
+    occupancy = np.zeros((height // coarse + 1, width // coarse + 1), np.uint8)
+
+    def _mark(points: list[tuple[int, int]], stroke_width: float) -> None:
+        # Credit only the opaque core: taper and soft edges leave the outer
+        # band translucent, and counting it would leave pinholes unfilled.
+        radius = max(1, int(stroke_width * 0.32 / coarse))
+        for px, py in points[::2]:
+            cv2.circle(occupancy, (px // coarse, py // coarse), radius, 1, -1)
+
+    def _make_stroke(
+        group: int,
+        start: tuple[int, int],
+        field: _DirectionField,
+        stroke_width: float,
+        opacity_mean: float,
+        order_key: float,
+    ) -> bool:
+        points = _walk_field(labels, group, start, field, stroke_width, rng, width, height)
+        if len(points) < 3:
+            return False
+        # A loaded brush never carries exactly the same mix twice.
+        base_colour = flat[start[1], start[0]].astype(np.float32)
+        tone = 1.0 + float(rng.normal(0.0, 0.045))
+        jitter = rng.normal(0.0, 2.5, 3).astype(np.float32)
+        colour = np.clip(base_colour * tone + jitter, 0, 255)
+        strokes.append(
+            Stroke(
+                points=points,
+                width=stroke_width,
+                opacity=float(np.clip(rng.normal(opacity_mean, 0.06), 0.45, 1.0)),
+                speed=float(np.clip(rng.normal(1.0, 0.25), 0.4, 2.2)),
+                order=order_key,
+                colour=(int(colour[0]), int(colour[1]), int(colour[2])),
+            )
+        )
+        _mark(points, stroke_width)
+        return True
 
     for group in range(group_count):
         mask = labels == group
@@ -196,50 +252,65 @@ def generate_fill_strokes(
             continue
 
         ys, xs = np.nonzero(mask)
-        # The region's long axis, from the covariance of its pixel positions.
-        if len(xs) > 8:
-            centred = np.stack([xs - xs.mean(), ys - ys.mean()]).astype(np.float32)
-            cov = centred @ centred.T / len(xs)
-            eigenvalues, eigenvectors = np.linalg.eigh(cov)
-            principal = eigenvectors[:, int(np.argmax(eigenvalues))]
-            base_angle = float(math.atan2(principal[1], principal[0]))
-        else:
-            base_angle = float(rng.uniform(0, math.pi))
-
-        count = max(6, int(total_budget * share))
-        picks = rng.choice(len(xs), size=min(count, len(xs)), replace=False)
-        # Bigger colour masses take a bigger brush.
-        stroke_width = float(
+        field = _direction_field(mask, xs, ys, rng)
+        base_width = float(
             np.clip(brush_min + (brush_max - brush_min) * math.sqrt(share), brush_min, brush_max)
         )
+        sweep_angle = field.sweep_angle
+        group_budget = max(10, int(total_budget * share))
+        mask_coarse = mask[::coarse, ::coarse]
 
-        # Row-by-row inside the group: order by position perpendicular to the
-        # brush angle, so the colour sweeps across its shapes like passes of a
-        # loaded brush rather than popping in at random.
-        perpendicular = (
-            xs[picks] * -math.sin(base_angle) + ys[picks] * math.cos(base_angle)
-        ).astype(np.float32)
-        row_order = np.argsort(np.argsort(perpendicular)).astype(np.float32)
-        row_order /= float(max(1, len(picks) - 1))
+        for pass_index, fill_pass in enumerate(_FILL_PASSES):
+            count = max(5, int(group_budget * fill_pass["share"]))
+            picks = rng.choice(len(xs), size=min(count, len(xs)), replace=False)
+            stroke_width = base_width * fill_pass["brush_scale"]
 
-        for index, pick in enumerate(picks):
-            start = (int(xs[pick]), int(ys[pick]))
-            wobble = float(rng.normal(0.0, 0.16))
-            points = _walk_in_region(
-                labels, group, start, base_angle + wobble, stroke_width, rng, width, height
-            )
-            if len(points) < 2:
-                continue
-            strokes.append(
-                Stroke(
-                    points=points,
-                    width=stroke_width,
-                    opacity=float(np.clip(rng.normal(0.9, 0.08), 0.5, 1.0)),
-                    speed=float(np.clip(rng.normal(1.0, 0.25), 0.4, 2.2)),
-                    # Group-major, row-minor with jitter: the group index sets
-                    # which colour is being laid in, the row sets the pass.
-                    order=(group + float(row_order[index]) * 0.9 + float(rng.uniform(0.0, 0.08))),
+            # Row-by-row inside the pass: order along the sweep so each pass
+            # moves across the shape like a hand, not like rainfall.
+            perpendicular = (
+                xs[picks] * -math.sin(sweep_angle) + ys[picks] * math.cos(sweep_angle)
+            ).astype(np.float32)
+            row_order = np.argsort(np.argsort(perpendicular)).astype(np.float32)
+            row_order /= float(max(1, len(picks) - 1))
+
+            for index, pick in enumerate(picks):
+                _make_stroke(
+                    group,
+                    (int(xs[pick]), int(ys[pick])),
+                    field,
+                    stroke_width,
+                    fill_pass["opacity"],
+                    group
+                    + pass_index * 0.4
+                    + float(row_order[index]) * 0.36
+                    + float(rng.uniform(0.0, 0.04)),
                 )
+
+        # Gap-filling: keep dabbing at whatever the passes missed until the
+        # shape is essentially covered, the way a hand goes back over bare
+        # spots before calling a colour done.
+        occ = occupancy[: mask_coarse.shape[0], : mask_coarse.shape[1]]
+        for _ in range(group_budget * 4):
+            bare_ys, bare_xs = np.nonzero(mask_coarse & (occ == 0))
+            if len(bare_xs) == 0 or len(bare_xs) < 0.015 * max(1, int(mask_coarse.sum())):
+                break
+            pick = int(rng.integers(len(bare_xs)))
+            start = (
+                int(np.clip(bare_xs[pick] * coarse + coarse // 2, 0, width - 1)),
+                int(np.clip(bare_ys[pick] * coarse + coarse // 2, 0, height - 1)),
+            )
+            if labels[start[1], start[0]] != group:
+                # A bare coarse cell can straddle a boundary; mark it so the
+                # loop cannot spin on an unpaintable cell.
+                cv2.circle(occupancy, (start[0] // coarse, start[1] // coarse), 1, 1, -1)
+                continue
+            _make_stroke(
+                group,
+                start,
+                field,
+                base_width * 0.7,
+                0.97,
+                group + 0.82 + float(rng.uniform(0.0, 0.12)),
             )
 
     # Normalise the composite keys onto 0..1 while preserving their order.
@@ -250,28 +321,88 @@ def generate_fill_strokes(
     return StrokeField(strokes=strokes)
 
 
-def _walk_in_region(
+@dataclass(slots=True)
+class _DirectionField:
+    """Per-region stroke orientation, doubled-angle encoded (mod-pi safe)."""
+
+    cos2: np.ndarray
+    sin2: np.ndarray
+    sweep_angle: float
+
+    def angle_at(self, x: int, y: int) -> float:
+        return 0.5 * math.atan2(float(self.sin2[y, x]), float(self.cos2[y, x]))
+
+
+def _direction_field(
+    mask: np.ndarray, xs: np.ndarray, ys: np.ndarray, rng: np.random.Generator
+) -> _DirectionField:
+    """How a painter's strokes run inside one shape.
+
+    Near the boundary, strokes follow the contour (nobody paints across an
+    edge they are trying to keep); toward the interior they relax onto the
+    shape's long axis. Orientations are blended as doubled angles because a
+    stroke direction is a line, not an arrow.
+    """
+    if len(xs) > 8:
+        centred = np.stack([xs - xs.mean(), ys - ys.mean()]).astype(np.float32)
+        cov = centred @ centred.T / len(xs)
+        eigenvalues, eigenvectors = np.linalg.eigh(cov)
+        principal = eigenvectors[:, int(np.argmax(eigenvalues))]
+        axis_angle = float(math.atan2(principal[1], principal[0]))
+    else:
+        axis_angle = float(rng.uniform(0, math.pi))
+
+    distance = cv2.distanceTransform(mask.astype(np.uint8), cv2.DIST_L2, 3)
+    smooth = cv2.GaussianBlur(distance, (0, 0), 7.0)
+    gx = cv2.Sobel(smooth, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(smooth, cv2.CV_32F, 0, 1, ksize=3)
+    # The contour tangent is the gradient rotated a quarter turn; encode it as
+    # a doubled angle so opposite tangents reinforce instead of cancelling.
+    magnitude = gx * gx + gy * gy + 1e-6
+    tangent_cos2 = (gy * gy - gx * gx) / magnitude
+    tangent_sin2 = (-2.0 * gx * gy) / magnitude
+
+    edge_weight = np.exp(-distance / 14.0).astype(np.float32)
+    axis_cos2 = math.cos(2.0 * axis_angle)
+    axis_sin2 = math.sin(2.0 * axis_angle)
+    cos2 = tangent_cos2 * edge_weight + axis_cos2 * (1.0 - edge_weight)
+    sin2 = tangent_sin2 * edge_weight + axis_sin2 * (1.0 - edge_weight)
+    return _DirectionField(cos2=cos2, sin2=sin2, sweep_angle=axis_angle)
+
+
+def _walk_field(
     labels: np.ndarray,
     group: int,
     start: tuple[int, int],
-    angle: float,
+    field: _DirectionField,
     width_hint: float,
     rng: np.random.Generator,
     width: int,
     height: int,
 ) -> list[tuple[int, int]]:
-    """A straight-ish stroke that stops at its colour region's boundary."""
+    """Follow the region's direction field, stopping at the colour boundary."""
     x, y = float(start[0]), float(start[1])
     points: list[tuple[int, int]] = [(int(x), int(y))]
-    step = 2.4
-    direction = angle
-    max_steps = int(max(28, width_hint * 3.5 / step))
+    step = 2.2
+    heading = field.angle_at(start[0], start[1])
+    if rng.random() < 0.5:
+        heading += math.pi
+    max_steps = int(max(30, width_hint * 4.0 / step))
     off_region = 0
 
     for _ in range(max_steps):
-        direction += float(rng.normal(0.0, 0.05))
-        x += math.cos(direction) * step
-        y += math.sin(direction) * step
+        cx = int(np.clip(x, 0, width - 1))
+        cy = int(np.clip(y, 0, height - 1))
+        target = field.angle_at(cx, cy)
+        # The field gives a line; take whichever direction of it is closer to
+        # where the hand is already travelling, plus a little wobble.
+        delta = math.atan2(math.sin(target - heading), math.cos(target - heading))
+        if abs(delta) > math.pi / 2:
+            delta = math.atan2(math.sin(delta + math.pi), math.cos(delta + math.pi))
+        heading += delta * 0.5 + float(rng.normal(0.0, 0.06))
+
+        x += math.cos(heading) * step
+        y += math.sin(heading) * step
         if not (0 <= x < width and 0 <= y < height):
             break
         if labels[int(y), int(x)] != group:
@@ -284,6 +415,121 @@ def _walk_in_region(
         off_region = 0
         points.append((int(x), int(y)))
     return points
+
+
+def render_fill_strokes(
+    previous: np.ndarray,
+    target: np.ndarray,
+    field: StrokeField,
+    progress: float,
+    *,
+    cache: dict | None = None,
+    seed: int = 0,
+) -> np.ndarray:
+    """Paint fill strokes as a stamped, tapered brush laying real pigment.
+
+    Each stroke is a run of soft round stamps whose radius swells and tapers
+    like pressure, carrying the stroke's own colour at partial opacity - so
+    paint overlaps, builds up and lets the sketch ghost through, instead of
+    appearing as flat opaque sausages.
+
+    ``cache`` carries the wet canvas between frames of one stage; passing the
+    same dict for monotonically increasing ``progress`` only paints the new
+    stamps. With no cache the frame is rebuilt from ``previous``.
+    """
+    progress = float(np.clip(progress, 0.0, 1.0))
+    if cache is None:
+        cache = {}
+    if "canvas" not in cache:
+        cache["canvas"] = previous.astype(np.float32).copy()
+        cache["drawn"] = [0] * len(field.strokes)
+        cache["stamps"] = {}
+    canvas: np.ndarray = cache["canvas"]
+
+    if field.strokes and progress > 0:
+        height, width = canvas.shape[:2]
+        for index, stroke in enumerate(field.strokes):
+            if stroke.order > progress:
+                continue
+            fraction = float(
+                np.clip((progress - stroke.order) * max(0.2, stroke.speed) * 6.0, 0.0, 1.0)
+            )
+            if fraction <= 0:
+                continue
+            stamps = cache["stamps"].get(index)
+            if stamps is None:
+                stamps = _stroke_stamps(stroke, seed + index)
+                cache["stamps"][index] = stamps
+            want = max(1, int(round(len(stamps) * fraction)))
+            for cx, cy, radius, alpha in stamps[cache["drawn"][index] : want]:
+                _blend_stamp(canvas, cx, cy, radius, alpha, stroke.colour, width, height)
+            cache["drawn"][index] = max(cache["drawn"][index], want)
+
+    return np.clip(canvas, 0, 255).astype(np.uint8)
+
+
+def _stroke_stamps(stroke: Stroke, seed: int) -> list[tuple[float, float, float, float]]:
+    """Resample a stroke path into brush stamps with a pressure profile."""
+    rng = np.random.default_rng(seed * 31 + 7)
+    points = np.asarray(stroke.points, dtype=np.float32)
+    deltas = np.diff(points, axis=0)
+    seg_lengths = np.hypot(deltas[:, 0], deltas[:, 1])
+    total = float(seg_lengths.sum())
+    if total <= 0:
+        return []
+    cumulative = np.concatenate([[0.0], np.cumsum(seg_lengths)])
+
+    spacing = max(1.6, stroke.width * 0.3)
+    distances = np.arange(0.0, total + spacing * 0.5, spacing)
+    stamps: list[tuple[float, float, float, float]] = []
+    for distance in distances:
+        t = distance / total
+        segment = min(len(seg_lengths) - 1, int(np.searchsorted(cumulative, distance) - 1))
+        segment = max(0, segment)
+        local = (distance - cumulative[segment]) / max(1e-6, seg_lengths[segment])
+        x, y = points[segment] + deltas[segment] * min(1.0, local)
+
+        # Pressure: the brush lands light, presses through the body of the
+        # mark, and lifts off the end.
+        attack = min(1.0, t / 0.18) if t < 0.18 else 1.0
+        release = min(1.0, (1.0 - t) / 0.28) if t > 0.72 else 1.0
+        pressure = 0.35 + 0.65 * min(attack, release)
+
+        radius = max(0.8, 0.5 * stroke.width * pressure * (1.0 + float(rng.normal(0.0, 0.07))))
+        wobble = rng.normal(0.0, radius * 0.08, 2)
+        alpha = stroke.opacity * (0.62 + 0.33 * pressure)
+        stamps.append((float(x + wobble[0]), float(y + wobble[1]), radius, float(alpha)))
+    return stamps
+
+
+def _blend_stamp(
+    canvas: np.ndarray,
+    cx: float,
+    cy: float,
+    radius: float,
+    alpha: float,
+    colour: tuple[int, int, int] | None,
+    width: int,
+    height: int,
+) -> None:
+    """Alpha-blend one soft round dab of pigment into the wet canvas."""
+    if colour is None:
+        return
+    reach = int(math.ceil(radius + 2))
+    x0, x1 = int(cx) - reach, int(cx) + reach + 1
+    y0, y1 = int(cy) - reach, int(cy) + reach + 1
+    if x1 <= 0 or y1 <= 0 or x0 >= width or y0 >= height:
+        return
+    x0c, x1c = max(0, x0), min(width, x1)
+    y0c, y1c = max(0, y0), min(height, y1)
+
+    yy, xx = np.mgrid[y0c:y1c, x0c:x1c].astype(np.float32)
+    distance = np.hypot(xx - cx, yy - cy)
+    mask = np.clip((radius - distance) / 1.2 + 0.5, 0.0, 1.0) * alpha
+
+    patch = canvas[y0c:y1c, x0c:x1c]
+    pigment = np.asarray(colour, dtype=np.float32)
+    patch += (pigment - patch) * mask[:, :, None]
 
 
 def _path_length(points: list[tuple[int, int]]) -> float:
