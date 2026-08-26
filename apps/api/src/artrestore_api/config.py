@@ -127,6 +127,9 @@ class Settings(BaseSettings):
     ffmpeg_binary: str = "ffmpeg"
     ffprobe_binary: str = "ffprobe"
     preview_max_dimension: int = 640
+    #: Sources larger than this (longest side) get a mid-size editor copy.
+    editor_preview_threshold: int = 2560
+    editor_preview_max_dimension: int = 2048
     max_render_seconds: int = 300
 
     # -- policy versions ----------------------------------------------------

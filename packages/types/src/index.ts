@@ -27,6 +27,7 @@ export type CanvasPresetKey =
 export type AssetType =
   | "source"
   | "source_preview"
+  | "editor_preview"
   | "mask"
   | "processed"
   | "processed_preview"

@@ -24,6 +24,14 @@ test.describe("marketing pages", () => {
     await expect.poll(async () => await slider.inputValue()).not.toBe(before);
   });
 
+  test("progress-photo mode is presented honestly", async ({ page }) => {
+    await page.goto("/");
+    await expect(
+      page.getByRole("heading", { name: /work-in-progress shots\? they become the backbone/i }),
+    ).toBeVisible();
+    await expect(page.getByText(/the app only fills the motion between them/i)).toBeVisible();
+  });
+
   test("policy pages are reachable and dated", async ({ page }) => {
     await page.goto("/");
     // The link appears in both the header nav and the footer.

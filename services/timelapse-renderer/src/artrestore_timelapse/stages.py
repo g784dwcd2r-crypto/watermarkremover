@@ -61,7 +61,7 @@ _TEMPLATES: dict[str, list[tuple[str, float, dict]]] = {
         ("construction_sketch", 1.5, {"reveal": "stroke", "jitter": 1.0}),
         ("refined_lines", 1.5, {"reveal": "stroke"}),
         ("hold", 0.35, {}),
-        ("base_colours", 2.0, {"reveal": "region"}),
+        ("base_colours", 2.0, {"reveal": "stroke_fill"}),
         ("shadows", 1.2, {"reveal": "tonal"}),
         ("highlights", 1.0, {"reveal": "tonal"}),
         ("texture_details", 1.8, {"reveal": "detail"}),

@@ -54,6 +54,12 @@ from .stages import (  # noqa: F401
     normalise_plan,
     plan_duration,
 )
-from .strokes import Stroke, StrokeField, generate_strokes, render_strokes  # noqa: F401
+from .strokes import (  # noqa: F401
+    Stroke,
+    StrokeField,
+    generate_fill_strokes,
+    generate_strokes,
+    render_strokes,
+)
 
 __version__ = "0.1.0"

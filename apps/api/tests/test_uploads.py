@@ -32,6 +32,27 @@ def test_upload_creates_a_preview_asset(api, demo_images):
     assert max(preview["width"], preview["height"]) <= 640
 
 
+def test_large_uploads_get_a_mid_size_editor_preview(api):
+    from artrestore_imaging import demo
+
+    project = api.create_project()
+    api.upload_image(project["id"], demo.to_png(demo.flat_gradient(3200, 2400)))
+    assets = api.get(f"/v1/projects/{project['id']}/assets").json()
+    editor = next(asset for asset in assets if asset["type"] == "editor_preview")
+    assert editor["download_url"]
+    assert max(editor["width"], editor["height"]) <= 2048
+    # The full-resolution source is untouched.
+    source = next(asset for asset in assets if asset["type"] == "source")
+    assert (source["width"], source["height"]) == (3200, 2400)
+
+
+def test_small_uploads_do_not_get_an_editor_preview(api, demo_images):
+    project = api.create_project()
+    api.upload_image(project["id"], demo_images["stamped_png"])
+    assets = api.get(f"/v1/projects/{project['id']}/assets").json()
+    assert not [asset for asset in assets if asset["type"] == "editor_preview"]
+
+
 def test_completion_records_the_ownership_attestation(api, demo_images):
     project = api.create_project()
     api.upload_image(project["id"], demo_images["stamped_png"])

@@ -25,7 +25,7 @@ from .presets import (
 )
 from .reveal import apply_reveal, build_reveal_map
 from .stages import Stage
-from .strokes import generate_strokes, render_strokes
+from .strokes import generate_fill_strokes, generate_strokes, render_strokes
 
 ProgressCallback = Callable[[float, str], None]
 
@@ -359,6 +359,16 @@ class TimelapseRenderer:
                     * float(stage.settings.get("brush_scale", 1.0)),
                     brush_max=float(options.brush_size_max)
                     * float(stage.settings.get("brush_scale", 1.0)),
+                    seed=options.seed + stage_index,
+                )
+            elif reveal_kind == "stroke_fill":
+                # Colour laid in as directional brush strokes, one palette
+                # region at a time, instead of a soft wash.
+                stroke_field = generate_fill_strokes(
+                    self.analysis,
+                    density=options.stroke_density,
+                    brush_min=float(options.brush_size_min),
+                    brush_max=float(options.brush_size_max),
                     seed=options.seed + stage_index,
                 )
             elif stage.stage_type not in ("hold", "final_hold"):

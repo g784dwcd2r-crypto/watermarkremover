@@ -1,5 +1,14 @@
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "@artrestore/ui";
-import { Brush, FileCheck2, Film, ShieldCheck, Sparkles, Timer } from "lucide-react";
+import {
+  Brush,
+  Camera,
+  FileCheck2,
+  Film,
+  Layers,
+  ShieldCheck,
+  Sparkles,
+  Timer,
+} from "lucide-react";
 import Link from "next/link";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -126,6 +135,60 @@ export default function LandingPage() {
             </Card>
           ))}
         </div>
+      </section>
+
+      <section
+        aria-labelledby="wip-heading"
+        className="paper-texture -mx-4 mb-16 rounded-[var(--radius-xl)] px-4 py-10 sm:-mx-6 sm:px-10"
+      >
+        <div className="max-w-3xl">
+          <Badge tone="primary" className="mb-3">
+            <Camera className="size-3.5" aria-hidden="true" />
+            Real Intermediate Frames
+          </Badge>
+          <h2
+            id="wip-heading"
+            className="font-serif text-2xl tracking-tight text-[var(--color-ink)] sm:text-3xl"
+          >
+            Kept your work-in-progress shots? They become the backbone.
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[var(--color-ink-muted)]">
+            If you photographed your sketch, your flats, or any stage along the way, upload them
+            with the finished piece. Those shots become genuine keyframes, in your order, exactly as
+            you took them — the app only fills the motion between them. Your real process carries
+            the video; nothing you uploaded is replaced by a generated guess.
+          </p>
+        </div>
+        <div className="mt-7 grid gap-5 md:grid-cols-3">
+          {[
+            {
+              icon: Camera,
+              title: "Upload your stages",
+              body: "The sketch on your desk, the flats from last Tuesday, the half-done pass you almost deleted. Any number, any spacing.",
+            },
+            {
+              icon: Layers,
+              title: "They anchor the timeline",
+              body: "Each shot appears as an untouched keyframe in the order you set. The reconstruction only supplies the transitions between your stages.",
+            },
+            {
+              icon: Film,
+              title: "Export, honestly labelled",
+              body: "The result still says it is a reconstruction in its file metadata — and the parts that are your real photos are listed as exactly that.",
+            },
+          ].map((step) => (
+            <div key={step.title}>
+              <step.icon className="size-5 text-[var(--color-primary)]" aria-hidden="true" />
+              <h3 className="mt-2 text-sm font-semibold text-[var(--color-ink)]">{step.title}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-[var(--color-ink-muted)]">
+                {step.body}
+              </p>
+            </div>
+          ))}
+        </div>
+        <Button asChild size="sm" className="mt-7">
+          <Link href="/projects/new?type=timelapse">Start with your progress shots</Link>
+        </Button>
       </section>
 
       <section

@@ -139,6 +139,75 @@ def test_cleanup_actually_changes_the_masked_pixels(api, cleanup_project, demo_i
     assert cleaned.shape == original.shape
 
 
+def test_batch_cleanup_processes_every_source(api, demo_images, rect_editor_state):
+    from artrestore_imaging import demo
+
+    project = api.create_project()
+    api.upload_image(project["id"], demo_images["stamped_png"])
+    # A second frame of the same shoot at a different size: the mask must
+    # scale to it rather than assume identical dimensions.
+    bigger, _ = demo.add_date_stamp(demo.flat_gradient(640, 480, seed=5))
+    api.upload_image(project["id"], demo.to_png(bigger), filename="second.png")
+
+    width, height = demo_images["size"]
+    box = _stamp_box(demo_images["stamp_mask"])
+    mask = api.save_mask(project["id"], rect_editor_state(*box, width=width, height=height))
+
+    response = api.post(
+        f"/v1/projects/{project['id']}/cleanup",
+        json={
+            "mask_version": mask["version"],
+            "mode": "fast_fill",
+            "mask_approved": True,
+            "apply_to_all_sources": True,
+            "acknowledged_protected_kinds": ["copyright_notice"],
+        },
+    )
+    assert response.status_code == 202, response.text
+    final = api.get(f"/v1/projects/{project['id']}/jobs/{response.json()['id']}").json()
+    assert final["status"] == "succeeded", final
+    result = final["result"]
+    assert result["batch"] is True
+    assert result["succeeded_count"] == 2
+    assert result["failed_count"] == 0
+    assert len(result["items"]) == 2
+
+    assets = api.get(f"/v1/projects/{project['id']}/assets").json()
+    processed = [asset for asset in assets if asset["type"] == "processed"]
+    assert len(processed) == 2
+    assert len({asset["id"] for asset in processed}) == 2
+
+
+def test_batch_cleanup_blocks_per_image_not_per_batch(api, demo_images, rect_editor_state):
+    """A protected region in one image must not sink the other images."""
+    project = api.create_project()
+    api.upload_image(project["id"], demo_images["stamped_png"])
+    api.upload_image(project["id"], demo_images["signed_png"], filename="signed.png")
+
+    x, y, w, h = demo_images["signature_box"]
+    mask = api.save_mask(project["id"], rect_editor_state(x, y, w, h, width=360, height=260))
+
+    response = api.post(
+        f"/v1/projects/{project['id']}/cleanup",
+        json={
+            "mask_version": mask["version"],
+            "mode": "fast_fill",
+            "mask_approved": True,
+            "apply_to_all_sources": True,
+            "acknowledged_protected_kinds": ["copyright_notice"],
+        },
+    )
+    assert response.status_code == 202, response.text
+    final = api.get(f"/v1/projects/{project['id']}/jobs/{response.json()['id']}").json()
+    assert final["status"] == "succeeded", final
+    result = final["result"]
+    assert result["succeeded_count"] == 1
+    assert result["failed_count"] == 1
+
+    failed = next(item for item in result["items"] if item["status"] == "failed")
+    assert failed["code"] == "protected_region"
+
+
 def test_cleanup_requires_ownership_confirmation(api, demo_images, rect_editor_state):
     project = api.create_project()
     # Upload without confirming.
