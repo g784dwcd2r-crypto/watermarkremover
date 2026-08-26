@@ -100,16 +100,99 @@ def build_reveal_map(
     return _coherent_ranks(field, sigma=max(2.0, min(height, width) / 70.0))
 
 
-def _stroke_field(
-    line_art: np.ndarray, rng: np.random.Generator, height: int, width: int
+def build_stroke_reveal(
+    lines: np.ndarray,
+    *,
+    rng: np.random.Generator,
+    element_order: str = "meander",
+    overlap: float = 0.0,
+    pause_fraction: float = 0.0,
+    importance: np.ndarray | None = None,
 ) -> np.ndarray:
-    """Order line pixels so each connected line draws itself end to end.
+    """A stroke-ordered reveal map for an arbitrary line image.
 
-    Components start at staggered times (largest structures first, with
-    jitter), and within a component pixels are ordered by their position along
-    a per-component direction, so every line appears as a mark being drawn
-    rather than fading in. Pixels off the lines are identical between the two
-    images a sketch stage blends, so their order is decorative background.
+    Used by stages whose lines are not the analysis line art - construction
+    shapes, ink passes - so they draw themselves the same way the sketch does.
+    """
+    height, width = lines.shape[:2]
+    return _stroke_field(
+        lines.astype(np.float32),
+        rng,
+        height,
+        width,
+        element_order=element_order,
+        overlap=overlap,
+        pause_fraction=pause_fraction,
+        importance=importance,
+    )
+
+
+def _tour_order(centroids: np.ndarray, start_index: int) -> list[int]:
+    """A nearest-neighbour tour: the path a hand takes across the elements."""
+    remaining = list(range(len(centroids)))
+    tour = [remaining.pop(start_index)]
+    while remaining:
+        last = centroids[tour[-1]]
+        distances = [float(np.hypot(*(centroids[i] - last))) for i in remaining]
+        tour.append(remaining.pop(int(np.argmin(distances))))
+    return tour
+
+
+def _element_sequence(
+    order: str,
+    centroids: np.ndarray,
+    areas: np.ndarray,
+    importance_scores: np.ndarray,
+    width: int,
+    height: int,
+) -> list[int]:
+    """In what order the hand visits the elements."""
+    if len(centroids) == 0:
+        return []
+    if order == "size":
+        return list(np.argsort(-areas))
+    if order == "importance":
+        return list(np.argsort(-(importance_scores + areas / (areas.max() or 1.0) * 0.2)))
+    if order == "zones":
+        # Work the canvas region by region (a 3x2 grid of zones, reading
+        # order), touring within each zone.
+        zone_of = (
+            np.minimum(2, (centroids[:, 0] / (width / 3)).astype(int))
+            + np.minimum(1, (centroids[:, 1] / (height / 2)).astype(int)) * 3
+        )
+        sequence: list[int] = []
+        for zone in range(6):
+            members = np.flatnonzero(zone_of == zone)
+            if len(members) == 0:
+                continue
+            local = _tour_order(centroids[members], 0)
+            sequence.extend(int(members[i]) for i in local)
+        return sequence
+    # meander: start at the top-left-most element and walk to whatever is
+    # nearest, the way a hand crosses a drawing.
+    start = int(np.argmin(centroids[:, 0] + centroids[:, 1]))
+    return _tour_order(centroids, start)
+
+
+def _stroke_field(
+    line_art: np.ndarray,
+    rng: np.random.Generator,
+    height: int,
+    width: int,
+    *,
+    element_order: str = "meander",
+    overlap: float = 0.0,
+    pause_fraction: float = 0.0,
+    importance: np.ndarray | None = None,
+) -> np.ndarray:
+    """Order line pixels so the drawing happens one element at a time.
+
+    Every connected line gets its own window of the stage, in sequence -
+    element by element, the way a person draws - with each line tracing
+    itself end to end inside its window. ``overlap`` lets the next element
+    begin slightly before the last finishes; ``pause_fraction`` reserves
+    quiet beats between elements; ``element_order`` picks the path the hand
+    takes (meander, zones, size, importance).
     """
     binary = (line_art > 60).astype(np.uint8)
     count, labels, stats, centroids = cv2.connectedComponentsWithStats(binary, connectivity=8)
@@ -119,30 +202,50 @@ def _stroke_field(
     sweep = xx * np.cos(angle) + yy * np.sin(angle)
     sweep = (sweep - sweep.min()) / (float(sweep.max() - sweep.min()) or 1.0)
 
-    # Background pixels are identical between the images a sketch stage blends,
-    # so their order is invisible; spreading them across the same 0..1 range as
-    # the lines keeps the visible drawing paced over the whole stage instead of
-    # compressing it into the first few ranks. Blurred noise has a tiny spread,
-    # so normalise it or the sweep would dominate and read as a wipe.
+    # Background pixels are identical between the images a sketch stage
+    # blends, so their order is invisible; spreading them across 0..1 keeps
+    # the overall pacing uniform without disturbing the element sequence.
     noise = _low_frequency_noise((height, width), rng, 10.0)
     noise = (noise - noise.min()) / (float(noise.max() - noise.min()) or 1.0)
     field = sweep * 0.25 + noise * 0.75
 
     if count > 1:
         areas = stats[1:, cv2.CC_STAT_AREA].astype(np.float32)
-        starts = np.empty(count, dtype=np.float32)
-        starts[0] = 0.0
-        # Bigger structures are laid in earlier, with enough jitter that the
-        # order never reads as strictly mechanical.
-        size_rank = np.argsort(np.argsort(-areas)).astype(np.float32) / max(1.0, count - 2)
-        centroid_sweep = (
-            centroids[1:, 0] * np.cos(angle) + centroids[1:, 1] * np.sin(angle)
-        ).astype(np.float32)
-        spread = centroid_sweep - centroid_sweep.min()
-        spread /= float(spread.max()) or 1.0
-        starts[1:] = (
-            size_rank * 0.45 + spread * 0.35 + rng.random(count - 1).astype(np.float32) * 0.20
+        component_centroids = centroids[1:].astype(np.float32)
+        if importance is not None:
+            scores = np.array(
+                [
+                    float(importance[labels == component + 1].mean())
+                    for component in range(count - 1)
+                ],
+                dtype=np.float32,
+            )
+        else:
+            scores = np.zeros(count - 1, dtype=np.float32)
+
+        sequence = _element_sequence(
+            element_order, component_centroids, areas, scores, width, height
         )
+
+        # Sequential windows: element k draws in its own slice of the stage,
+        # sized by how much line there is to draw (sub-linear, so small marks
+        # still take a visible moment).
+        weights = np.maximum(areas[sequence], 1.0) ** 0.7
+        weights = weights / weights.sum()
+        pause = float(np.clip(pause_fraction, 0.0, 0.4))
+        gap = pause / max(1, len(sequence) - 1) if len(sequence) > 1 else 0.0
+        windows = weights * (1.0 - pause)
+
+        starts = np.empty(count, dtype=np.float32)
+        spans = np.empty(count, dtype=np.float32)
+        starts[0] = 0.0
+        spans[0] = 1.0
+        cursor = 0.0
+        for position, component in enumerate(sequence):
+            begin = max(0.0, cursor - float(np.clip(overlap, 0.0, 0.9)) * float(windows[position]))
+            starts[component + 1] = begin
+            spans[component + 1] = float(windows[position])
+            cursor += float(windows[position]) + gap
 
         per_component_angle = rng.uniform(0, np.pi * 2, count).astype(np.float32)
         cos_a = np.cos(per_component_angle)[labels]
@@ -150,7 +253,6 @@ def _stroke_field(
         along = xx * cos_a + yy * sin_a
 
         on_lines = labels > 0
-        # Normalise the along-the-line position within each component.
         flat_labels = labels[on_lines]
         flat_along = along[on_lines]
         lows = np.full(count, np.inf, dtype=np.float32)
@@ -160,7 +262,7 @@ def _stroke_field(
         span = np.maximum(highs - lows, 1e-3)
         local = (flat_along - lows[flat_labels]) / span[flat_labels]
 
-        field[on_lines] = starts[flat_labels] + local * 0.22
+        field[on_lines] = starts[flat_labels] + local * spans[flat_labels]
 
     return _rank_normalise(field)
 

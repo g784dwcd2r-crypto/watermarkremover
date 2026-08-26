@@ -91,12 +91,28 @@ def test_describe_plan_reports_timing_windows():
         assert earlier["ends_at"] == pytest.approx(later["starts_at"], abs=1e-6)
 
 
-def test_sketch_is_completed_in_full_before_any_colour():
-    stages = build_plan("sketch_to_colour", total_seconds=20)
+def test_sketch_workflow_follows_a_real_drawing_order():
+    """Planning, rough, refined, ink, erase - all before any colour; the
+    background is painted late, after shading, and cleanup comes last."""
+    stages = build_plan("sketch_to_colour", total_seconds=30)
     types = [stage.stage_type for stage in stages]
-    last_sketch = max(types.index("construction_sketch"), types.index("refined_lines"))
-    first_colour = types.index("base_colours")
-    assert last_sketch < types.index("hold") < first_colour
+    sequence = [
+        "blank_canvas",
+        "construction_planning",
+        "construction_sketch",
+        "refined_lines",
+        "ink_lines",
+        "erase_sketch",
+        "base_colours",
+        "markings",
+        "shadows",
+        "highlights",
+        "background_paint",
+        "texture_details",
+    ]
+    indices = [types.index(name) for name in sequence]
+    assert indices == sorted(indices)
+    assert types.index("erase_sketch") < types.index("base_colours")
 
 
 def test_hold_stage_keeps_the_canvas_still(analysis):
@@ -188,7 +204,7 @@ def test_stroke_rendering_grows_monotonically(analysis):
     assert covered[0] < covered[1] < covered[2]
 
 
-def test_fill_strokes_block_in_colour_groups(analysis):
+def test_fill_strokes_block_in_one_colour_at_a_time(analysis):
     import cv2
     from artrestore_timelapse import generate_fill_strokes
 
@@ -197,12 +213,17 @@ def test_fill_strokes_block_in_colour_groups(analysis):
     orders = [stroke.order for stroke in field.strokes]
     assert min(orders) >= 0.0 and max(orders) < 1.0
 
-    # Group-major ordering: the largest colour group (label 0) is laid in
-    # before smaller ones, so label index and drawing order correlate.
+    # One colour at a time: strokes of the same colour group stay contiguous
+    # in the drawing order, whatever the group sequence (subject before
+    # background) turned out to be.
     labels = cv2.medianBlur(analysis.palette_labels.astype(np.uint8), 5).astype(np.int32)
-    groups = [int(labels[stroke.points[0][1], stroke.points[0][0]]) for stroke in field.strokes]
-    correlation = float(np.corrcoef(groups, orders)[0, 1])
-    assert correlation > 0.5, "fill strokes should paint colour group by colour group"
+    by_group: dict[int, list[float]] = {}
+    for stroke in field.strokes:
+        group = int(labels[stroke.points[0][1], stroke.points[0][0]])
+        by_group.setdefault(group, []).append(stroke.order)
+    spans = [float(np.std(values)) for values in by_group.values() if len(values) > 5]
+    assert len(spans) >= 2
+    assert float(np.mean(spans)) < 0.14, "each colour should be laid in as one block"
 
 
 def test_fill_strokes_are_deterministic(analysis):

@@ -31,9 +31,14 @@ MODE_LABELS = {
 
 STAGE_LABELS = {
     "blank_canvas": "Blank canvas",
-    "construction_sketch": "Construction sketch",
-    "refined_lines": "Refined line art",
+    "construction_planning": "Construction shapes",
+    "construction_sketch": "Rough sketch",
+    "refined_lines": "Refined sketch",
+    "ink_lines": "Clean line art",
+    "erase_sketch": "Erasing the sketch",
     "base_colours": "Base colours",
+    "markings": "Markings and details",
+    "background_paint": "Background",
     "shadows": "Shadows",
     "highlights": "Highlights",
     "texture_details": "Texture and finishing details",
@@ -54,17 +59,27 @@ STAGE_LABELS = {
 
 #: Relative weights used to distribute a requested total duration.
 _TEMPLATES: dict[str, list[tuple[str, float, dict]]] = {
-    # The sketch is always completed in full - construction, then clean lines,
-    # then a breath while the artist looks it over - before any colour is laid.
+    # A real workflow, in a real order: a blank moment, exploratory
+    # construction shapes, a rough sketch with corrections, a refined sketch
+    # over the fading rough, clean ink with the pencil erased beneath it,
+    # subject colours before background, markings, restrained shading and
+    # highlights, the background late, and a final cleanup pass. Weights
+    # follow the reference timing (planning ~10%, rough ~15%, refined ~15%,
+    # ink ~15%, flats ~15%, markings ~12%, shading ~9%, background ~6%,
+    # cleanup ~3%).
     "sketch_to_colour": [
-        ("blank_canvas", 0.35, {}),
-        ("construction_sketch", 1.5, {"reveal": "stroke", "jitter": 1.0}),
-        ("refined_lines", 1.5, {"reveal": "stroke"}),
-        ("hold", 0.35, {}),
-        ("base_colours", 2.0, {"reveal": "stroke_fill"}),
-        ("shadows", 1.2, {"reveal": "tonal"}),
-        ("highlights", 1.0, {"reveal": "tonal"}),
-        ("texture_details", 1.8, {"reveal": "detail"}),
+        ("blank_canvas", 0.6, {}),
+        ("construction_planning", 1.1, {}),
+        ("construction_sketch", 2.4, {"reveal": "stroke", "jitter": 1.0}),
+        ("refined_lines", 2.4, {"reveal": "stroke"}),
+        ("ink_lines", 2.1, {"reveal": "stroke"}),
+        ("erase_sketch", 0.4, {"reveal": "dissolve"}),
+        ("base_colours", 2.4, {"reveal": "stroke_fill"}),
+        ("markings", 1.9, {"reveal": "stroke_fill"}),
+        ("shadows", 0.9, {"reveal": "tonal"}),
+        ("highlights", 0.6, {"reveal": "tonal"}),
+        ("background_paint", 1.0, {"reveal": "stroke_fill"}),
+        ("texture_details", 0.5, {"reveal": "detail"}),
         ("final_hold", 0.6, {}),
     ],
     "paint_reveal": [
