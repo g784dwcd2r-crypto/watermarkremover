@@ -133,6 +133,46 @@ def test_hold_stage_keeps_the_canvas_still(analysis):
     assert np.array_equal(hold_frames[0], frames[renderer.plan.frame_counts[0] - 1])
 
 
+# -- the pen ----------------------------------------------------------------
+
+
+def test_pen_draws_one_stroke_at_a_time(analysis):
+    from artrestore_timelapse.pen import plan_pen
+
+    plan = plan_pen(analysis.line_art, rng=np.random.default_rng(3))
+    assert len(plan.strokes) > 10
+    # Strict sequence: every stroke begins at or after the previous one ends.
+    ends = plan.starts + plan.costs
+    assert np.all(plan.starts[1:] >= ends[:-1] - 1e-4)
+
+
+def test_pen_plan_is_deterministic(analysis):
+    from artrestore_timelapse.pen import plan_pen
+
+    first = plan_pen(analysis.line_art, rng=np.random.default_rng(11))
+    second = plan_pen(analysis.line_art, rng=np.random.default_rng(11))
+    assert len(first.strokes) == len(second.strokes)
+    assert all(np.array_equal(a, b) for a, b in zip(first.strokes, second.strokes, strict=True))
+
+
+def test_pen_rendering_grows_and_finishes(analysis):
+    from artrestore_timelapse.pen import plan_pen, render_pen
+
+    plan = plan_pen(analysis.line_art, rng=np.random.default_rng(5))
+    underlay = np.full_like(analysis.rgb, 245)
+    target = np.zeros_like(analysis.rgb)
+    cache: dict = {}
+    covered = []
+    for progress in (0.25, 0.5, 0.75, 1.0):
+        frame = render_pen(underlay, target, plan, progress, cache=cache)
+        covered.append(float((frame.mean(axis=2) < 128).mean()))
+    assert covered[0] < covered[1] < covered[2] < covered[3]
+    # At full progress the pen has visited every line.
+    mask = cache["mask"]
+    lines = analysis.line_art > 60
+    assert float((mask[lines] > 0).mean()) > 0.95
+
+
 # -- reveal maps ------------------------------------------------------------
 
 
