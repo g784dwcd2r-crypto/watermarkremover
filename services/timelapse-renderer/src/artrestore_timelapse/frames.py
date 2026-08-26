@@ -551,6 +551,10 @@ class TimelapseRenderer:
         previous = self._background()
         emitted = 0
         total = self.plan.total_frames
+        # When the plan drew ink, the colour goes on a layer underneath it:
+        # the ink lines are composited back over every painted frame, so the
+        # paint never buries the sketch it is supposed to respect.
+        inked_plan = any(entry.stage_type == "ink_lines" for entry in self.plan.stages)
 
         for stage_index, (stage, frame_count) in enumerate(
             zip(self.plan.stages, self.plan.frame_counts, strict=True)
@@ -686,6 +690,10 @@ class TimelapseRenderer:
                         cache=fill_cache,
                         seed=options.seed + stage_index,
                     )
+                    if inked_plan:
+                        canvas = self._lines_over(
+                            canvas, strength=1.0, lines=self._ink_lines(), colour=(30, 29, 36)
+                        )
                 elif stroke_field is not None:
                     canvas = render_strokes(
                         previous, target, stroke_field, eased * options.stroke_speed

@@ -244,7 +244,7 @@ def test_stroke_rendering_grows_monotonically(analysis):
     assert covered[0] < covered[1] < covered[2]
 
 
-def test_fill_strokes_block_in_one_colour_at_a_time(analysis):
+def test_fill_strokes_work_element_by_element(analysis):
     import cv2
     from artrestore_timelapse import generate_fill_strokes
 
@@ -253,17 +253,41 @@ def test_fill_strokes_block_in_one_colour_at_a_time(analysis):
     orders = [stroke.order for stroke in field.strokes]
     assert min(orders) >= 0.0 and max(orders) < 1.0
 
-    # One colour at a time: strokes of the same colour group stay contiguous
-    # in the drawing order, whatever the group sequence (subject before
-    # background) turned out to be.
+    # Element by element: strokes inside one line-bounded shape of one colour
+    # stay contiguous in the drawing order - the brush finishes an element
+    # before moving on, rather than painting a colour everywhere at once.
     labels = cv2.medianBlur(analysis.palette_labels.astype(np.uint8), 5).astype(np.int32)
-    by_group: dict[int, list[float]] = {}
+    line_mask = analysis.line_art > 60
+    height, width = labels.shape
+    min_area = max(64.0, height * width * 0.0003)
+    element_map = np.full(labels.shape, -1, np.int32)
+    next_id = 0
+    for group in range(int(labels.max()) + 1):
+        open_mask = (labels == group) & ~line_mask
+        count, components = cv2.connectedComponents(open_mask.astype(np.uint8), connectivity=4)
+        for component in range(1, count):
+            selection = components == component
+            if selection.sum() >= min_area:
+                element_map[selection] = next_id
+                next_id += 1
+    by_element: dict[int, list[float]] = {}
     for stroke in field.strokes:
-        group = int(labels[stroke.points[0][1], stroke.points[0][0]])
-        by_group.setdefault(group, []).append(stroke.order)
-    spans = [float(np.std(values)) for values in by_group.values() if len(values) > 5]
+        element = int(element_map[stroke.points[0][1], stroke.points[0][0]])
+        if element >= 0:
+            by_element.setdefault(element, []).append(stroke.order)
+    spans = [float(np.std(values)) for values in by_element.values() if len(values) > 5]
     assert len(spans) >= 2
-    assert float(np.mean(spans)) < 0.14, "each colour should be laid in as one block"
+    assert float(np.mean(spans)) < 0.12, "each sketch element should be painted as one block"
+
+
+def test_fill_strokes_respect_the_sketch_lines(analysis):
+    from artrestore_timelapse import generate_fill_strokes
+
+    field = generate_fill_strokes(analysis, seed=3)
+    lines = analysis.line_art > 60
+    for stroke in field.strokes:
+        for x, y in stroke.points:
+            assert not lines[y, x], "a fill stroke painted across a sketch line"
 
 
 def test_fill_strokes_paint_one_at_a_time(analysis):
