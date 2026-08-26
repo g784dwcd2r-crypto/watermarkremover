@@ -65,17 +65,8 @@ def run_cleanup_task(self, job_id: str) -> dict:
         asset_ids = [str(value) for value in (parameters.get("asset_ids") or [])]
 
         with session_scope() as session:
-            mask_row = session.execute(
-                select(Mask).where(
-                    Mask.project_id == project.id,
-                    Mask.version == int(parameters.get("mask_version", 0)),
-                )
-            ).scalar_one_or_none()
-            if mask_row is None:
-                raise ImagingError("The requested mask version no longer exists.")
-            editor_state = dict(mask_row.editor_state or {})
-            mask_version = mask_row.version
-
+            # Sources first: "nothing to process" is the more fundamental
+            # problem and the message the user needs when both are missing.
             if asset_ids:
                 rows = session.execute(
                     select(Asset).where(
@@ -103,6 +94,17 @@ def run_cleanup_task(self, job_id: str) -> dict:
                 if source is None:
                     raise ImagingError("This project has no completed source upload.")
                 source_keys = [(str(source.id), source.storage_key)]
+
+            mask_row = session.execute(
+                select(Mask).where(
+                    Mask.project_id == project.id,
+                    Mask.version == int(parameters.get("mask_version", 0)),
+                )
+            ).scalar_one_or_none()
+            if mask_row is None:
+                raise ImagingError("The requested mask version no longer exists.")
+            editor_state = dict(mask_row.editor_state or {})
+            mask_version = mask_row.version
 
         adjustments = MaskAdjustments.from_dict(
             parameters.get("adjustments") or editor_state.get("adjustments")
