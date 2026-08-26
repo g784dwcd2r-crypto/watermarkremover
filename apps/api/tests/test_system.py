@@ -147,6 +147,24 @@ def test_production_safety_flags_a_missing_cookie_domain():
     assert settings_with_domain.check_production_safety() == []
 
 
+def test_platform_postgres_urls_are_rewritten_to_the_psycopg_driver():
+    from artrestore_api.config import Settings
+
+    for given in (
+        "postgres://user:pw@host:5432/db",
+        "postgresql://user:pw@host:5432/db",
+    ):
+        assert (
+            Settings(database_url=given).database_url == "postgresql+psycopg://user:pw@host:5432/db"
+        )
+    # Explicit drivers and other databases pass through untouched.
+    assert (
+        Settings(database_url="postgresql+psycopg://u@h/db").database_url
+        == "postgresql+psycopg://u@h/db"
+    )
+    assert Settings(database_url="sqlite:///x.db").database_url == "sqlite:///x.db"
+
+
 def test_production_safety_flags_missing_email_delivery():
     from artrestore_api.config import Settings
 

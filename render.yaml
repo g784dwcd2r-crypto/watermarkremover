@@ -1,0 +1,155 @@
+# ArtRestore Studio on Render — https://render.com/docs/blueprint-spec
+#
+# Creates: the API (FastAPI), the web app (Next.js), one background worker
+# (Celery, with the retention-sweep beat embedded via -B), a managed Postgres
+# database and a Key Value (Redis-compatible) instance.
+#
+# Two things Render cannot provide and you must bring yourself (the dashboard
+# will prompt for every value marked sync: false on first deploy):
+#
+#   1. S3-compatible object storage (Cloudflare R2, Backblaze B2, AWS S3, ...)
+#      -> ARS_S3_* values below.
+#   2. The public URLs. After the first deploy, copy each service's
+#      xxx.onrender.com URL into NEXT_PUBLIC_API_URL / ARS_PUBLIC_* below and
+#      deploy again (NEXT_PUBLIC_* is baked into the web build, so the web
+#      service must rebuild after the API URL is known).
+#
+# Cookies: the api and web live on different onrender.com subdomains, which
+# browsers treat as different sites — hence SAMESITE=none below. On a custom
+# domain (app.example.com + api.example.com) switch to lax and set
+# ARS_COOKIE_DOMAIN=.example.com instead.
+
+databases:
+  - name: artrestore-db
+    plan: basic-256mb
+    postgresMajorVersion: "16"
+
+services:
+  # -- Redis-compatible store: sessions, rate limits, Celery broker ---------
+  - type: keyvalue
+    name: artrestore-redis
+    plan: free
+    maxmemoryPolicy: noeviction
+    ipAllowList: [] # internal connections only
+
+  # -- FastAPI --------------------------------------------------------------
+  - type: web
+    name: artrestore-api
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./infrastructure/docker/Dockerfile.api
+    dockerContext: .
+    healthCheckPath: /healthz
+    preDeployCommand: cd /app/apps/api && alembic upgrade head
+    envVars:
+      - key: ARS_ENVIRONMENT
+        value: production
+      - key: ARS_DEBUG
+        value: "false"
+      - key: ARS_SECRET_KEY
+        generateValue: true
+      - key: ARS_DATABASE_URL
+        fromDatabase:
+          name: artrestore-db
+          property: connectionString
+      - key: ARS_REDIS_URL
+        fromService:
+          type: keyvalue
+          name: artrestore-redis
+          property: connectionString
+      - key: ARS_CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: artrestore-redis
+          property: connectionString
+      - key: ARS_CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: artrestore-redis
+          property: connectionString
+      - key: ARS_COOKIE_SECURE
+        value: "true"
+      - key: ARS_COOKIE_SAMESITE
+        value: none
+      - key: ARS_STORAGE_BACKEND
+        value: s3
+      - key: ARS_S3_BUCKET
+        sync: false
+      - key: ARS_S3_REGION
+        sync: false
+      - key: ARS_S3_ENDPOINT_URL
+        sync: false
+      - key: ARS_S3_ACCESS_KEY_ID
+        sync: false
+      - key: ARS_S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: ARS_PUBLIC_API_URL
+        sync: false # https://artrestore-api.onrender.com after first deploy
+      - key: ARS_PUBLIC_WEB_URL
+        sync: false # https://artrestore-web.onrender.com after first deploy
+      - key: ARS_CORS_ORIGINS
+        sync: false # same value as ARS_PUBLIC_WEB_URL
+      # Optional — real email for password reset / sign-in links:
+      # ARS_SMTP_HOST, ARS_SMTP_PORT, ARS_SMTP_USERNAME, ARS_SMTP_PASSWORD,
+      # ARS_SMTP_FROM (add them in the dashboard when you have a provider).
+
+  # -- Next.js --------------------------------------------------------------
+  - type: web
+    name: artrestore-web
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./infrastructure/docker/Dockerfile.web
+    dockerContext: .
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        sync: false # https://artrestore-api.onrender.com — baked in at build
+      - key: NEXT_PUBLIC_APP_NAME
+        value: ArtRestore Studio
+
+  # -- Celery worker (retention beat embedded via -B) -----------------------
+  - type: worker
+    name: artrestore-worker
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./infrastructure/docker/Dockerfile.worker
+    dockerContext: .
+    dockerCommand: celery -A artrestore_worker.celery_app:app worker -B --loglevel=info --concurrency=2
+    envVars:
+      - key: ARS_ENVIRONMENT
+        value: production
+      - key: ARS_SECRET_KEY
+        fromService:
+          type: web
+          name: artrestore-api
+          envVarKey: ARS_SECRET_KEY
+      - key: ARS_DATABASE_URL
+        fromDatabase:
+          name: artrestore-db
+          property: connectionString
+      - key: ARS_REDIS_URL
+        fromService:
+          type: keyvalue
+          name: artrestore-redis
+          property: connectionString
+      - key: ARS_CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: artrestore-redis
+          property: connectionString
+      - key: ARS_CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: artrestore-redis
+          property: connectionString
+      - key: ARS_STORAGE_BACKEND
+        value: s3
+      - key: ARS_S3_BUCKET
+        sync: false
+      - key: ARS_S3_REGION
+        sync: false
+      - key: ARS_S3_ENDPOINT_URL
+        sync: false
+      - key: ARS_S3_ACCESS_KEY_ID
+        sync: false
+      - key: ARS_S3_SECRET_ACCESS_KEY
+        sync: false

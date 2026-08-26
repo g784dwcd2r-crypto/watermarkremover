@@ -63,6 +63,27 @@ The API also refuses request bodies larger than the upload budget before
 reading them, so the proxy's `client_max_body_size` is a second line of
 defence rather than the only one.
 
+## Render (one-click blueprint)
+
+`render.yaml` at the repository root is a [Render Blueprint](https://render.com/docs/infrastructure-as-code)
+that creates the API, the web app, one Celery worker (retention beat embedded
+via `-B`), managed Postgres and a Key Value instance. Deploy with
+**New → Blueprint** in the Render dashboard, pointing at this repository.
+
+Two rounds are needed because `NEXT_PUBLIC_API_URL` is baked into the web
+build: deploy once, copy the generated `*.onrender.com` URLs into the
+`sync: false` variables (`NEXT_PUBLIC_API_URL`, `ARS_PUBLIC_API_URL`,
+`ARS_PUBLIC_WEB_URL`, `ARS_CORS_ORIGINS`), and deploy again. Object storage is
+external — any S3-compatible bucket (Cloudflare R2, Backblaze B2, AWS S3) via
+the `ARS_S3_*` values, with the bucket CORS from
+`infrastructure/deployment/s3-cors.json` pointed at the web URL.
+
+The blueprint sets `ARS_COOKIE_SAMESITE=none` because the two `onrender.com`
+subdomains count as different sites to the browser. On a custom domain, switch
+to `lax` and set `ARS_COOKIE_DOMAIN` to the shared parent domain instead.
+Platform-issued `postgres://` connection strings are accepted as-is — the
+settings loader rewrites them onto the psycopg driver.
+
 ## Building
 
 ```bash
