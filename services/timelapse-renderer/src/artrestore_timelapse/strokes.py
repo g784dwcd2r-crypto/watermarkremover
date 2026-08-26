@@ -167,59 +167,76 @@ def generate_strokes(
     return StrokeField(strokes=strokes)
 
 
-def _schedule_serial(
+def _schedule_hand_tour(
     strokes: list[Stroke],
+    buckets: list[int],
     *,
     rng: np.random.Generator,
-    pause_fraction: float = 0.0,
     late_indices: set[int] | None = None,
     late_fraction: float = 0.0,
-    flight: float = 1.15,
+    bucket_beat: float = 45.0,
 ) -> None:
-    """Give every stroke its own sequential window of the stage.
+    """Order and time the strokes the way one hand actually paints.
 
-    One mark at a time: stroke k begins when stroke k-1 ends (give or take
-    ``flight``), its window sized by how long the mark takes to make.
-    ``pause_fraction`` reserves quiet beats where the composite key jumps to
-    a new colour group; ``late_fraction`` sends some gap-work strokes to the
-    end of the stage, like a hand going back over earlier areas.
+    Buckets (sketch element x pass) are worked in order; inside each, the next
+    stroke is whichever starts nearest to where the brush just lifted - the
+    same nearest-neighbour tour the pen uses - reversing a stroke when its far
+    end is the closer one. Timing is strictly one-in-flight: each stroke's
+    window is its drawing cost, an air-travel beat proportional to the hop
+    separates strokes, and a longer beat separates buckets - longer still
+    when the new bucket needs a clearly different brush size, the pause of
+    an artist swapping brushes.
+
+    ``late_fraction`` sends some flagged gap-work strokes to a final bucket,
+    like a hand going back over earlier areas before calling it done.
     """
     if not strokes:
         return
-    keys = np.array([stroke.order for stroke in strokes], dtype=np.float64)
+    bucket_keys = np.array(buckets, dtype=np.int64)
     if late_indices and late_fraction > 0:
+        final = int(bucket_keys.max()) + 1
         for index in late_indices:
             if rng.random() < late_fraction:
-                keys[index] += 10_000.0
-    sequence = np.argsort(keys, kind="stable")
+                bucket_keys[index] = final
 
-    weights = np.array(
-        [strokes[int(i)].length + 2.0 * strokes[int(i)].width for i in sequence],
-        dtype=np.float64,
-    )
-    weights = np.maximum(weights, 1.0)
-    weights /= weights.sum()
+    position = np.array([0.0, 0.0], np.float32)
+    schedule: list[tuple[int, float, float]] = []  # (stroke index, hop, window)
+    previous_brush = 0.0
+    for bucket in sorted({int(b) for b in bucket_keys}):
+        members = [int(i) for i in np.flatnonzero(bucket_keys == bucket)]
+        bucket_brush = float(np.median([strokes[i].width for i in members]))
+        swaps_brush = previous_brush > 0 and (
+            bucket_brush > previous_brush * 1.35 or bucket_brush < previous_brush / 1.35
+        )
+        previous_brush = bucket_brush
+        first_in_bucket = True
+        while members:
+            heads = np.array([strokes[i].points[0] for i in members], np.float32)
+            tails = np.array([strokes[i].points[-1] for i in members], np.float32)
+            head_d = np.linalg.norm(heads - position, axis=1)
+            tail_d = np.linalg.norm(tails - position, axis=1)
+            best = int(np.argmin(np.minimum(head_d, tail_d)))
+            index = members.pop(best)
+            stroke = strokes[index]
+            if tail_d[best] < head_d[best]:
+                stroke.points = stroke.points[::-1]
+            hop = float(min(min(head_d[best], tail_d[best]) / 3.0, 60.0))
+            if first_in_bucket:
+                hop += bucket_beat * (1.8 if swaps_brush else 1.0)
+                first_in_bucket = False
+            window = max(1.0, stroke.length + 2.0 * stroke.width)
+            schedule.append((index, hop, window))
+            position = np.asarray(stroke.points[-1], np.float32)
 
-    boundaries = [
-        position
-        for position in range(1, len(sequence))
-        if int(keys[sequence[position]]) != int(keys[sequence[position - 1]])
-    ]
-    pause = float(np.clip(pause_fraction, 0.0, 0.35))
-    gap = pause / len(boundaries) if boundaries else 0.0
-    windows = weights * (1.0 - pause)
-
+    total = sum(hop + window for _, hop, window in schedule) or 1.0
     cursor = 0.0
-    boundary_set = set(boundaries)
-    for position, index in enumerate(sequence):
-        if position in boundary_set:
-            cursor += gap
-        stroke = strokes[int(index)]
-        window = float(windows[position])
-        stroke.order = float(min(cursor, 0.999))
-        # Complete the mark within its own window: the next mark starts as
-        # this one lifts off.
-        stroke.speed = float(np.clip(1.0 / (6.0 * max(1e-4, window) * flight), 0.05, 4000.0))
+    for index, hop, window in schedule:
+        cursor += hop
+        stroke = strokes[index]
+        stroke.order = float(cursor / total)
+        # Complete the mark exactly within its own window: the brush lifts as
+        # the next mark's travel begins.
+        stroke.speed = float(np.clip(total / (6.0 * window), 0.05, 40000.0))
         cursor += window
 
 
@@ -245,11 +262,15 @@ def generate_fill_strokes(
 ) -> StrokeField:
     """Strokes that block in the base colours the way a painter lays flats.
 
-    One colour at a time, two passes per colour (a loose block-in, then a
-    fill), strokes following a direction field that hugs each shape's
-    contours near its edges and relaxes to the shape's long axis inside,
-    and each stroke loaded with its own slightly-varied pigment so the
-    colour builds up instead of appearing flat.
+    One sketch element at a time: each colour is split into the separate
+    shapes the line art bounds (the sky, one mountain, the boat's hull), and
+    the brush finishes an element - block-in, fill, gap work - before moving
+    to the next. Strokes follow a direction field that hugs the element's
+    contours near its edges, stop at the ink lines instead of crossing them,
+    and each stroke is loaded with its own slightly-varied pigment so the
+    colour builds up instead of appearing flat. The brush itself changes
+    with the element: a broad brush for the big fields, a small one for the
+    little shapes.
     """
     rng = np.random.default_rng(seed + 4241)
     height, width = analysis.rgb.shape[:2]
@@ -258,6 +279,7 @@ def generate_fill_strokes(
     labels = cv2.medianBlur(analysis.palette_labels.astype(np.uint8), 5).astype(np.int32)
     group_count = int(labels.max()) + 1
     area = height * width
+    line_mask = analysis.line_art > 60
 
     total_budget = int(np.clip(area / 950.0 * density, 120, max_strokes))
     strokes: list[Stroke] = []
@@ -277,14 +299,17 @@ def generate_fill_strokes(
             cv2.circle(occupancy, (px // coarse, py // coarse), radius, 1, -1)
 
     def _make_stroke(
-        group: int,
+        element_map: np.ndarray,
+        element_id: int,
         start: tuple[int, int],
         field: _DirectionField,
         stroke_width: float,
         opacity_mean: float,
         order_key: float,
     ) -> bool:
-        points = _walk_field(labels, group, start, field, stroke_width, rng, width, height)
+        points = _walk_field(
+            element_map, element_id, start, field, stroke_width, rng, width, height
+        )
         if len(points) < 3:
             return False
         # A loaded brush never carries exactly the same mix twice.
@@ -305,44 +330,89 @@ def generate_fill_strokes(
         _mark(points, stroke_width)
         return True
 
-    # A painter works the subject before the backdrop. Classify each colour
-    # group by how much of it lies in the background, then order: subject
-    # groups (largest first), background groups after - or only one side of
-    # that split when the stage asks for it.
-    subject_groups: list[int] = []
-    background_groups: list[int] = []
+    # The sketch's elements: each colour split into the separate shapes the
+    # line art bounds. Every element keeps its own mask; the group's stray
+    # pixels (thin slivers, fragments smaller than a real shape) are handed
+    # to the nearest element of the same colour so nothing is left bare.
+    # Line pixels belong to no element - the brush stops at the ink.
+    element_labels = np.full((height, width), -1, np.int32)
+    element_entries: list[tuple[int, float, float]] = []  # (id, share, backgroundness)
+    min_area = max(64.0, area * 0.0003)
+    next_element = 0
     for group in range(group_count):
-        selection = labels == group
-        share = float(selection.mean())
+        group_mask = labels == group
+        share = float(group_mask.mean())
         if share < 0.002:
             continue
-        backgroundness = float(analysis.background_mask[selection].mean())
-        # Only large, border-dominated fields count as background; a small
-        # distinctive region is part of the subject even if it touches an
-        # edge - a boat, a reflection, a tree line.
-        is_background = backgroundness > 0.55 and share > 0.08
-        (background_groups if is_background else subject_groups).append(group)
-    if region_filter == "subject":
-        ordered_groups = subject_groups
-    elif region_filter == "background":
-        ordered_groups = background_groups
-    else:
-        ordered_groups = subject_groups + background_groups
+        open_mask = group_mask & ~line_mask
+        if not open_mask.any():
+            open_mask = group_mask
+        _, components, stats, _ = cv2.connectedComponentsWithStats(
+            open_mask.astype(np.uint8), connectivity=4
+        )
+        areas = stats[1:, cv2.CC_STAT_AREA]
+        kept = [int(i) + 1 for i in np.argsort(areas)[::-1][:12] if areas[i] >= min_area]
+        if not kept and len(areas):
+            kept = [int(np.argmax(areas)) + 1]
+        if not kept:
+            continue
+        component_to_element = {comp: next_element + rank for rank, comp in enumerate(kept)}
+        # Nearest-element assignment for the group's leftover pixels.
+        seeds = np.isin(components, kept)
+        _, nearest = cv2.distanceTransformWithLabels(
+            (~seeds).astype(np.uint8), cv2.DIST_L2, 3, labelType=cv2.DIST_LABEL_PIXEL
+        )
+        comp_map = np.full(int(components.max()) + 1, -1, np.int32)
+        for comp, element in component_to_element.items():
+            comp_map[comp] = element
+        lookup = np.zeros(int(nearest.max()) + 1, np.int32)
+        lookup[nearest[seeds]] = comp_map[components[seeds]]
+        claim = group_mask & ~line_mask
+        element_labels[claim] = lookup[nearest[claim]]
+        for comp in kept:
+            element_id = component_to_element[comp]
+            element_mask = element_labels == element_id
+            element_share = float(element_mask.mean())
+            backgroundness = float(analysis.background_mask[element_mask].mean())
+            element_entries.append((element_id, element_share, backgroundness))
+        next_element += len(kept)
 
-    for position, group in enumerate(ordered_groups):
-        mask = labels == group
-        share = float(mask.mean())
+    # A painter works the subject before the backdrop, and the big shapes
+    # before the small ones. Only a large, border-dominated field counts as
+    # background; a small distinctive shape is subject even at the edge -
+    # a boat, a reflection, a tree line.
+    subject_elements = [e for e in element_entries if not (e[2] > 0.55 and e[1] > 0.05)]
+    background_elements = [e for e in element_entries if e[2] > 0.55 and e[1] > 0.05]
+    subject_elements.sort(key=lambda entry: -entry[1])
+    background_elements.sort(key=lambda entry: -entry[1])
+    if region_filter == "subject":
+        ordered_elements = subject_elements
+    elif region_filter == "background":
+        ordered_elements = background_elements
+    else:
+        ordered_elements = subject_elements + background_elements
+
+    for position, (element_id, share, _) in enumerate(ordered_elements):
+        mask = element_labels == element_id
         ys, xs = np.nonzero(mask)
+        if len(xs) < 8:
+            continue
         field = _direction_field(mask, xs, ys, rng)
+        # The brush is chosen for the shape: a broad flat for the big
+        # fields, a small round for the little elements.
         base_width = float(
-            np.clip(brush_min + (brush_max - brush_min) * math.sqrt(share), brush_min, brush_max)
+            np.clip(
+                brush_min + (brush_max - brush_min) * math.sqrt(min(1.0, share * 2.5)),
+                brush_min,
+                brush_max,
+            )
         )
         sweep_angle = field.sweep_angle
-        group_budget = max(10, int(total_budget * share))
+        element_budget = max(8, int(total_budget * share))
         mask_coarse = mask[::coarse, ::coarse]
 
         for pass_index, fill_pass in enumerate(_FILL_PASSES):
-            count = max(5, int(group_budget * fill_pass["share"]))
+            count = max(4, int(element_budget * fill_pass["share"]))
             picks = rng.choice(len(xs), size=min(count, len(xs)), replace=False)
             stroke_width = base_width * fill_pass["brush_scale"]
 
@@ -356,7 +426,8 @@ def generate_fill_strokes(
 
             for index, pick in enumerate(picks):
                 _make_stroke(
-                    group,
+                    element_labels,
+                    element_id,
                     (int(xs[pick]), int(ys[pick])),
                     field,
                     stroke_width,
@@ -368,10 +439,10 @@ def generate_fill_strokes(
                 )
 
         # Gap-filling: keep dabbing at whatever the passes missed until the
-        # shape is essentially covered, the way a hand goes back over bare
-        # spots before calling a colour done.
+        # element is essentially covered, the way a hand goes back over bare
+        # spots before calling a shape done.
         occ = occupancy[: mask_coarse.shape[0], : mask_coarse.shape[1]]
-        for _ in range(group_budget * 4):
+        for _ in range(element_budget * 4):
             bare_ys, bare_xs = np.nonzero(mask_coarse & (occ == 0))
             if len(bare_xs) == 0 or len(bare_xs) < 0.015 * max(1, int(mask_coarse.sum())):
                 break
@@ -380,13 +451,14 @@ def generate_fill_strokes(
                 int(np.clip(bare_xs[pick] * coarse + coarse // 2, 0, width - 1)),
                 int(np.clip(bare_ys[pick] * coarse + coarse // 2, 0, height - 1)),
             )
-            if labels[start[1], start[0]] != group:
+            if element_labels[start[1], start[0]] != element_id:
                 # A bare coarse cell can straddle a boundary; mark it so the
                 # loop cannot spin on an unpaintable cell.
                 cv2.circle(occupancy, (start[0] // coarse, start[1] // coarse), 1, 1, -1)
                 continue
             if _make_stroke(
-                group,
+                element_labels,
+                element_id,
                 start,
                 field,
                 base_width * 0.7,
@@ -395,12 +467,21 @@ def generate_fill_strokes(
             ):
                 gap_indices.add(len(strokes) - 1)
 
-    _schedule_serial(
+    # Bucket = sketch element x pass (block-in, fill, gap-work): one hand
+    # finishes an element before it moves to the next.
+    buckets = []
+    for stroke in strokes:
+        whole = int(stroke.order)
+        frac = stroke.order - whole
+        slot = 0 if frac < 0.4 else (1 if frac < 0.8 else 2)
+        buckets.append(whole * 3 + slot)
+    _schedule_hand_tour(
         strokes,
+        buckets,
         rng=rng,
-        pause_fraction=pause_fraction,
         late_indices=gap_indices,
         late_fraction=late_touchup_fraction,
+        bucket_beat=45.0 + 600.0 * float(np.clip(pause_fraction, 0.0, 0.35)),
     )
     return StrokeField(strokes=strokes)
 
@@ -460,7 +541,12 @@ def generate_detail_strokes(
             )
         )
 
-    _schedule_serial(strokes, rng=rng, pause_fraction=0.03)
+    # Two tiers: the strongest, most identifying details first, then the
+    # rest - each toured by one hand.
+    if strokes:
+        median = float(np.median([stroke.order for stroke in strokes]))
+        tiers = [0 if stroke.order <= median else 1 for stroke in strokes]
+        _schedule_hand_tour(strokes, tiers, rng=rng)
     return StrokeField(strokes=strokes)
 
 
@@ -523,7 +609,12 @@ def _walk_field(
     width: int,
     height: int,
 ) -> list[tuple[int, int]]:
-    """Follow the region's direction field, stopping at the colour boundary."""
+    """Follow the region's direction field, stopping at the region's edge.
+
+    For fill painting the labels are sketch elements with the ink lines left
+    unlabelled, so a stroke genuinely stops at the drawn line instead of
+    ploughing across it.
+    """
     x, y = float(start[0]), float(start[1])
     points: list[tuple[int, int]] = [(int(x), int(y))]
     step = 2.2
@@ -549,10 +640,10 @@ def _walk_field(
         if not (0 <= x < width and 0 <= y < height):
             break
         if labels[int(y), int(x)] != group:
-            # Tolerate a few stray pixels of another label; end the stroke
-            # only once it has genuinely left its colour region.
+            # Tolerate a single stray pixel (label speckle), but end the
+            # stroke as soon as it actually reaches a line or another shape.
             off_region += 1
-            if off_region > 3:
+            if off_region > 1:
                 break
             continue
         off_region = 0

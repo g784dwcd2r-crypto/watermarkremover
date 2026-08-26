@@ -429,7 +429,7 @@ class TimelapseRenderer:
             )
         if kind == "base_colours":
             return self._lines_over(analysis.flat_colours, strength=0.55)
-        if kind in ("markings", "background_paint"):
+        if kind in ("markings", "background_paint", "texture_details"):
             # Paint stages: the pigment strokes do the work; the target is
             # only the fallback if a custom timeline strips their reveal.
             return previous
@@ -440,7 +440,12 @@ class TimelapseRenderer:
         if kind == "highlights":
             subject = self._subject_soft()
             return self._apply_tonal(previous, analysis.highlights * subject, factor=0.25)
-        if kind in ("texture_details", "colour_correction", "polish", "final_hold"):
+        if kind == "final_hold":
+            # The finished piece is whatever was actually painted. Swapping in
+            # the source image here would read as the artwork snapping to a
+            # photograph, so the hold simply keeps looking at the canvas.
+            return previous
+        if kind in ("colour_correction", "polish"):
             return np.ascontiguousarray(analysis.rgb)
         if kind == "background":
             mask = analysis.background_mask[:, :, None]
@@ -546,6 +551,10 @@ class TimelapseRenderer:
         previous = self._background()
         emitted = 0
         total = self.plan.total_frames
+        # When the plan drew ink, the colour goes on a layer underneath it:
+        # the ink lines are composited back over every painted frame, so the
+        # paint never buries the sketch it is supposed to respect.
+        inked_plan = any(entry.stage_type == "ink_lines" for entry in self.plan.stages)
 
         for stage_index, (stage, frame_count) in enumerate(
             zip(self.plan.stages, self.plan.frame_counts, strict=True)
@@ -582,11 +591,16 @@ class TimelapseRenderer:
                     * float(stage.settings.get("brush_scale", 1.0)),
                     seed=options.seed + stage_index,
                 )
-            elif stage.stage_type == "markings":
+            elif stage.stage_type in ("markings", "texture_details"):
                 # Small deliberate strokes placing the identifying details.
+                # The finishing pass is the same brush laying a sparser set of
+                # last touches over the painted canvas - never a fade into the
+                # source image.
+                detail_share = 0.45 if stage.stage_type == "texture_details" else 1.0
                 fill_field = generate_detail_strokes(
                     self.analysis,
                     density=options.stroke_density
+                    * detail_share
                     * float(stage.settings.get("density_scale", 1.0)),
                     brush_min=max(
                         2.0,
@@ -676,6 +690,10 @@ class TimelapseRenderer:
                         cache=fill_cache,
                         seed=options.seed + stage_index,
                     )
+                    if inked_plan:
+                        canvas = self._lines_over(
+                            canvas, strength=1.0, lines=self._ink_lines(), colour=(30, 29, 36)
+                        )
                 elif stroke_field is not None:
                     canvas = render_strokes(
                         previous, target, stroke_field, eased * options.stroke_speed
