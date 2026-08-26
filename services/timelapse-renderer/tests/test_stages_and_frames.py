@@ -266,6 +266,17 @@ def test_fill_strokes_block_in_one_colour_at_a_time(analysis):
     assert float(np.mean(spans)) < 0.14, "each colour should be laid in as one block"
 
 
+def test_fill_strokes_paint_one_at_a_time(analysis):
+    from artrestore_timelapse import generate_fill_strokes
+
+    field = generate_fill_strokes(analysis, seed=3)
+    timed = sorted(
+        ((stroke.order, stroke.order + 1.0 / (6.0 * stroke.speed)) for stroke in field.strokes),
+    )
+    for (_, previous_end), (next_start, _) in itertools.pairwise(timed):
+        assert next_start >= previous_end - 1e-6, "two brush strokes were in flight at once"
+
+
 def test_fill_strokes_are_deterministic(analysis):
     from artrestore_timelapse import generate_fill_strokes
 

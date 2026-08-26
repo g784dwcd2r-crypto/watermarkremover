@@ -167,59 +167,68 @@ def generate_strokes(
     return StrokeField(strokes=strokes)
 
 
-def _schedule_serial(
+def _schedule_hand_tour(
     strokes: list[Stroke],
+    buckets: list[int],
     *,
     rng: np.random.Generator,
-    pause_fraction: float = 0.0,
     late_indices: set[int] | None = None,
     late_fraction: float = 0.0,
-    flight: float = 1.15,
+    bucket_beat: float = 45.0,
 ) -> None:
-    """Give every stroke its own sequential window of the stage.
+    """Order and time the strokes the way one hand actually paints.
 
-    One mark at a time: stroke k begins when stroke k-1 ends (give or take
-    ``flight``), its window sized by how long the mark takes to make.
-    ``pause_fraction`` reserves quiet beats where the composite key jumps to
-    a new colour group; ``late_fraction`` sends some gap-work strokes to the
-    end of the stage, like a hand going back over earlier areas.
+    Buckets (colour group x pass) are worked in order; inside each, the next
+    stroke is whichever starts nearest to where the brush just lifted - the
+    same nearest-neighbour tour the pen uses - reversing a stroke when its far
+    end is the closer one. Timing is strictly one-in-flight: each stroke's
+    window is its drawing cost, an air-travel beat proportional to the hop
+    separates strokes, and a longer beat separates buckets.
+
+    ``late_fraction`` sends some flagged gap-work strokes to a final bucket,
+    like a hand going back over earlier areas before calling it done.
     """
     if not strokes:
         return
-    keys = np.array([stroke.order for stroke in strokes], dtype=np.float64)
+    bucket_keys = np.array(buckets, dtype=np.int64)
     if late_indices and late_fraction > 0:
+        final = int(bucket_keys.max()) + 1
         for index in late_indices:
             if rng.random() < late_fraction:
-                keys[index] += 10_000.0
-    sequence = np.argsort(keys, kind="stable")
+                bucket_keys[index] = final
 
-    weights = np.array(
-        [strokes[int(i)].length + 2.0 * strokes[int(i)].width for i in sequence],
-        dtype=np.float64,
-    )
-    weights = np.maximum(weights, 1.0)
-    weights /= weights.sum()
+    position = np.array([0.0, 0.0], np.float32)
+    schedule: list[tuple[int, float, float]] = []  # (stroke index, hop, window)
+    for bucket in sorted({int(b) for b in bucket_keys}):
+        members = [int(i) for i in np.flatnonzero(bucket_keys == bucket)]
+        first_in_bucket = True
+        while members:
+            heads = np.array([strokes[i].points[0] for i in members], np.float32)
+            tails = np.array([strokes[i].points[-1] for i in members], np.float32)
+            head_d = np.linalg.norm(heads - position, axis=1)
+            tail_d = np.linalg.norm(tails - position, axis=1)
+            best = int(np.argmin(np.minimum(head_d, tail_d)))
+            index = members.pop(best)
+            stroke = strokes[index]
+            if tail_d[best] < head_d[best]:
+                stroke.points = stroke.points[::-1]
+            hop = float(min(min(head_d[best], tail_d[best]) / 3.0, 60.0))
+            if first_in_bucket:
+                hop += bucket_beat
+                first_in_bucket = False
+            window = max(1.0, stroke.length + 2.0 * stroke.width)
+            schedule.append((index, hop, window))
+            position = np.asarray(stroke.points[-1], np.float32)
 
-    boundaries = [
-        position
-        for position in range(1, len(sequence))
-        if int(keys[sequence[position]]) != int(keys[sequence[position - 1]])
-    ]
-    pause = float(np.clip(pause_fraction, 0.0, 0.35))
-    gap = pause / len(boundaries) if boundaries else 0.0
-    windows = weights * (1.0 - pause)
-
+    total = sum(hop + window for _, hop, window in schedule) or 1.0
     cursor = 0.0
-    boundary_set = set(boundaries)
-    for position, index in enumerate(sequence):
-        if position in boundary_set:
-            cursor += gap
-        stroke = strokes[int(index)]
-        window = float(windows[position])
-        stroke.order = float(min(cursor, 0.999))
-        # Complete the mark within its own window: the next mark starts as
-        # this one lifts off.
-        stroke.speed = float(np.clip(1.0 / (6.0 * max(1e-4, window) * flight), 0.05, 4000.0))
+    for index, hop, window in schedule:
+        cursor += hop
+        stroke = strokes[index]
+        stroke.order = float(cursor / total)
+        # Complete the mark exactly within its own window: the brush lifts as
+        # the next mark's travel begins.
+        stroke.speed = float(np.clip(total / (6.0 * window), 0.05, 40000.0))
         cursor += window
 
 
@@ -395,12 +404,21 @@ def generate_fill_strokes(
             ):
                 gap_indices.add(len(strokes) - 1)
 
-    _schedule_serial(
+    # Bucket = colour group x pass (block-in, fill, gap-work), worked in
+    # order by one hand.
+    buckets = []
+    for stroke in strokes:
+        whole = int(stroke.order)
+        frac = stroke.order - whole
+        slot = 0 if frac < 0.4 else (1 if frac < 0.8 else 2)
+        buckets.append(whole * 3 + slot)
+    _schedule_hand_tour(
         strokes,
+        buckets,
         rng=rng,
-        pause_fraction=pause_fraction,
         late_indices=gap_indices,
         late_fraction=late_touchup_fraction,
+        bucket_beat=45.0 + 600.0 * float(np.clip(pause_fraction, 0.0, 0.35)),
     )
     return StrokeField(strokes=strokes)
 
@@ -460,7 +478,12 @@ def generate_detail_strokes(
             )
         )
 
-    _schedule_serial(strokes, rng=rng, pause_fraction=0.03)
+    # Two tiers: the strongest, most identifying details first, then the
+    # rest - each toured by one hand.
+    if strokes:
+        median = float(np.median([stroke.order for stroke in strokes]))
+        tiers = [0 if stroke.order <= median else 1 for stroke in strokes]
+        _schedule_hand_tour(strokes, tiers, rng=rng)
     return StrokeField(strokes=strokes)
 
 
