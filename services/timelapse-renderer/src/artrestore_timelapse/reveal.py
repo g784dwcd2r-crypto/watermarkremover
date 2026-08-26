@@ -100,6 +100,16 @@ def build_reveal_map(
     return _coherent_ranks(field, sigma=max(2.0, min(height, width) / 70.0))
 
 
+def build_stroke_reveal(lines: np.ndarray, *, rng: np.random.Generator) -> np.ndarray:
+    """A stroke-ordered reveal map for an arbitrary line image.
+
+    Used by stages whose lines are not the analysis line art - construction
+    shapes, ink passes - so they draw themselves the same way the sketch does.
+    """
+    height, width = lines.shape[:2]
+    return _stroke_field(lines.astype(np.float32), rng, height, width)
+
+
 def _stroke_field(
     line_art: np.ndarray, rng: np.random.Generator, height: int, width: int
 ) -> np.ndarray:

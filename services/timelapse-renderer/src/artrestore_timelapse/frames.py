@@ -8,6 +8,7 @@ strokes. Everything is seeded, so the same project renders identically twice.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 
@@ -23,9 +24,10 @@ from .presets import (
     hex_to_rgb,
     resolve_canvas,
 )
-from .reveal import apply_reveal, build_reveal_map
+from .reveal import apply_reveal, build_reveal_map, build_stroke_reveal
 from .stages import Stage
 from .strokes import (
+    generate_detail_strokes,
     generate_fill_strokes,
     generate_strokes,
     render_fill_strokes,
@@ -133,6 +135,8 @@ class TimelapseRenderer:
         self.plan = self._resolve_plan()
         self._rng = np.random.default_rng(self.options.seed)
         self._graphite: np.ndarray | None = None
+        self._planning: np.ndarray | None = None
+        self._ink: np.ndarray | None = None
 
     # -- planning -----------------------------------------------------------
 
@@ -188,14 +192,29 @@ class TimelapseRenderer:
         grain = (fine * 1.6 + fibre * fibre_scale)[:, :, None]
         return np.clip(canvas + grain, 0, 255).astype(np.uint8)
 
-    def _lines_over(self, base: np.ndarray, *, strength: float, jitter: float = 0.0) -> np.ndarray:
-        """Composite the artwork's line structure over a base image.
+    def _lines_over(
+        self,
+        base: np.ndarray,
+        *,
+        strength: float,
+        jitter: float = 0.0,
+        lines: np.ndarray | None = None,
+        colour: tuple[int, int, int] = (46, 44, 52),
+    ) -> np.ndarray:
+        """Composite a line layer over a base image.
 
         The ink is broken up with a graphite texture - pencil never deposits
         evenly - so the sketch stages read as hand-drawn rather than printed.
+        Defaults to the artwork's line structure; construction shapes and the
+        ink pass supply their own line images.
         """
-        lines = self.line_art if self.line_art is not None else self.analysis.line_art
-        lines = lines.astype(np.float32) / 255.0
+        if lines is None:
+            lines = self.line_art if self.line_art is not None else self.analysis.line_art
+            lines = lines.astype(np.float32) / 255.0
+        else:
+            lines = lines.astype(np.float32)
+            if lines.max() > 1.5:
+                lines = lines / 255.0
         if jitter > 0:
             # A construction sketch is deliberately imprecise.
             shift = self._sketch_jitter(lines.shape, jitter)
@@ -204,10 +223,95 @@ class TimelapseRenderer:
         alpha = np.clip(lines * strength, 0.0, 1.0) * self._graphite_texture(lines.shape)
         alpha = alpha[:, :, None]
         ink = np.zeros_like(base, np.float32)
-        ink[:, :] = (46, 44, 52)
+        ink[:, :] = colour
         return np.clip(ink * alpha + base.astype(np.float32) * (1.0 - alpha), 0, 255).astype(
             np.uint8
         )
+
+    def _planning_lines(self) -> np.ndarray:
+        """Exploratory construction shapes: the marks an artist makes first.
+
+        Ellipses fitted to the subject and the biggest colour masses, a centre
+        line, and a horizon guide - light, imperfect, and derived only from
+        the artwork's own composition.
+        """
+        if self._planning is not None:
+            return self._planning
+        analysis = self.analysis
+        height, width = analysis.rgb.shape[:2]
+        canvas = np.zeros((height, width), np.float32)
+
+        def _guide_for(mask: np.ndarray) -> None:
+            contours, _ = cv2.findContours(
+                mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            )
+            if not contours:
+                return
+            largest = max(contours, key=cv2.contourArea)
+            contour_area = cv2.contourArea(largest)
+            if contour_area < 0.01 * height * width or len(largest) < 5:
+                return
+            x0, y0, bw, bh = cv2.boundingRect(largest)
+            if bw * bh > 0.55 * height * width:
+                # A shape this wide is a band, not a blob: a real planner
+                # marks its placement with a horizontal guide, not a giant
+                # oval swallowing the canvas.
+                centre_row = y0 + bh // 2
+                cv2.line(
+                    canvas,
+                    (x0 + int(bw * 0.03), centre_row),
+                    (x0 + int(bw * 0.97), centre_row),
+                    1.0,
+                    2,
+                )
+                return
+            cv2.ellipse(canvas, cv2.fitEllipse(largest), 1.0, 2)
+
+        # The subject's overall mass, then the biggest interior colour masses.
+        _guide_for(analysis.subject_mask > 0.55)
+        shares = analysis.palette_shares
+        for group in range(min(4, len(shares))):
+            _guide_for(analysis.palette_labels == group)
+
+        # A centre line and a horizon guide.
+        cv2.line(canvas, (width // 2, int(height * 0.06)), (width // 2, int(height * 0.94)), 1.0, 2)
+        row_energy = (analysis.edges > 0)[int(height * 0.2) : int(height * 0.8)].sum(axis=1)
+        if row_energy.size:
+            horizon = int(height * 0.2) + int(np.argmax(row_energy))
+            cv2.line(canvas, (int(width * 0.04), horizon), (int(width * 0.96), horizon), 1.0, 2)
+
+        # Pencil quality: wobble the geometry and soften it slightly.
+        shift = self._sketch_jitter(canvas.shape, 1.4)
+        canvas = cv2.remap(canvas, shift[0], shift[1], cv2.INTER_LINEAR)
+        canvas = cv2.GaussianBlur(canvas, (0, 0), 0.9)
+        self._planning = np.clip(canvas, 0.0, 1.0)
+        return self._planning
+
+    def _ink_lines(self) -> np.ndarray:
+        """Clean line art with hand-drawn weight variation.
+
+        Outer silhouettes and major shapes carry a heavier line; interior
+        details stay thin - the classic inking rule.
+        """
+        if self._ink is not None:
+            return self._ink
+        analysis = self.analysis
+        thin = (self.line_art if self.line_art is not None else analysis.line_art).astype(
+            np.float32
+        ) / 255.0
+
+        subject = (analysis.subject_mask > 0.5).astype(np.uint8)
+        silhouette = cv2.morphologyEx(
+            subject, cv2.MORPH_GRADIENT, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        )
+        silhouette = cv2.dilate(
+            silhouette, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+        ).astype(np.float32)
+
+        thick = cv2.dilate(thin, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
+        ink = np.maximum(thin, thick * silhouette)
+        self._ink = np.clip(ink, 0.0, 1.0)
+        return self._ink
 
     def _graphite_texture(self, shape: tuple[int, int]) -> np.ndarray:
         """A 0.55..1.0 multiplier that breaks lines up like pencil on tooth."""
@@ -245,20 +349,45 @@ class TimelapseRenderer:
             # A deliberate pause: the canvas stays exactly as it is, the way an
             # artist stops to look the sketch over before committing to colour.
             return previous
+        if kind == "construction_planning":
+            return self._lines_over(self._background(), strength=0.3, lines=self._planning_lines())
         if kind == "construction_sketch":
+            # The rough sketch is drawn over the faint construction shapes.
+            base = self._lines_over(self._background(), strength=0.22, lines=self._planning_lines())
             return self._lines_over(
-                self._background(), strength=0.45, jitter=float(stage.settings.get("jitter", 1.0))
+                base, strength=0.45, jitter=float(stage.settings.get("jitter", 1.0))
             )
         if kind == "refined_lines":
-            return self._lines_over(self._background(), strength=0.9)
+            # The rough drops back as the clean sketch is drawn over it; the
+            # construction shapes have all but disappeared under the work.
+            base = self._lines_over(self._background(), strength=0.07, lines=self._planning_lines())
+            base = self._lines_over(base, strength=0.16, jitter=1.0)
+            return self._lines_over(base, strength=0.85)
+        if kind == "ink_lines":
+            # Confident ink over the surviving pencil.
+            base = self._lines_over(self._background(), strength=0.14, jitter=1.0)
+            base = self._lines_over(base, strength=0.3)
+            return self._lines_over(
+                base, strength=1.0, lines=self._ink_lines(), colour=(30, 29, 36)
+            )
+        if kind == "erase_sketch":
+            # The pencil is erased from beneath the finished ink.
+            return self._lines_over(
+                self._background(), strength=1.0, lines=self._ink_lines(), colour=(30, 29, 36)
+            )
         if kind == "base_colours":
             return self._lines_over(analysis.flat_colours, strength=0.55)
+        if kind in ("markings", "background_paint"):
+            # Paint stages: the pigment strokes do the work; the target is
+            # only the fallback if a custom timeline strips their reveal.
+            return previous
         if kind == "shadows":
-            shaded = self._apply_tonal(analysis.flat_colours, analysis.shadows, factor=-0.35)
-            return self._lines_over(shaded, strength=0.45)
+            subject = self._subject_soft()
+            shaded = self._apply_tonal(previous, analysis.shadows * subject, factor=-0.3)
+            return shaded
         if kind == "highlights":
-            lifted = self._apply_tonal(previous, analysis.highlights, factor=0.30)
-            return self._lines_over(lifted, strength=0.3)
+            subject = self._subject_soft()
+            return self._apply_tonal(previous, analysis.highlights * subject, factor=0.25)
         if kind in ("texture_details", "colour_correction", "polish", "final_hold"):
             return np.ascontiguousarray(analysis.rgb)
         if kind == "background":
@@ -303,6 +432,29 @@ class TimelapseRenderer:
             # generated frame in place of an authentic one.
             return previous
         return np.ascontiguousarray(analysis.rgb)
+
+    def _subject_soft(self) -> np.ndarray:
+        """The subject mask with a soft edge, for restrained shading."""
+        return cv2.GaussianBlur(np.clip(self.analysis.subject_mask, 0.0, 1.0), (0, 0), 3.0)
+
+    def _correction_mask(self) -> np.ndarray:
+        """Line components the rough sketch briefly erases and redraws.
+
+        A handful of medium-sized marks - the believable scale of a real
+        correction: not a speck, not the whole silhouette.
+        """
+        lines = self.line_art if self.line_art is not None else self.analysis.line_art
+        count, labels, stats, _ = cv2.connectedComponentsWithStats(
+            (lines > 60).astype(np.uint8), connectivity=8
+        )
+        if count <= 2:
+            return np.zeros(lines.shape[:2], np.float32)
+        areas = stats[1:, cv2.CC_STAT_AREA]
+        ranked = np.argsort(areas) + 1
+        middle = ranked[len(ranked) // 2 : len(ranked) // 2 + 4]
+        mask = np.isin(labels, middle).astype(np.float32)
+        mask = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+        return cv2.GaussianBlur(mask, (0, 0), 1.2)
 
     def _apply_tonal(self, base: np.ndarray, mask: np.ndarray, *, factor: float) -> np.ndarray:
         weight = np.clip(mask, 0.0, 1.0)[:, :, None]
@@ -357,6 +509,7 @@ class TimelapseRenderer:
             fill_field = None
             fill_cache: dict = {}
             reveal_map = None
+            correction_mask = None
             if stage.stage_type == "stroke_pass":
                 stroke_field = generate_strokes(
                     self.analysis,
@@ -368,18 +521,42 @@ class TimelapseRenderer:
                     * float(stage.settings.get("brush_scale", 1.0)),
                     seed=options.seed + stage_index,
                 )
+            elif stage.stage_type == "markings":
+                # Small deliberate strokes placing the identifying details.
+                fill_field = generate_detail_strokes(
+                    self.analysis,
+                    density=options.stroke_density,
+                    brush_min=max(2.0, float(options.brush_size_min) * 0.7),
+                    seed=options.seed + stage_index,
+                )
             elif reveal_kind == "stroke_fill":
                 # Colour painted in as pigment-loaded brush strokes, one
-                # palette region at a time, instead of a soft wash.
+                # palette region at a time. The flats stage covers the subject
+                # first (leaving the background for its own late stage when
+                # the plan has one); the background stage paints the rest.
+                if stage.stage_type == "background_paint":
+                    region_filter = "background"
+                elif any(entry.stage_type == "background_paint" for entry in self.plan.stages):
+                    region_filter = "subject"
+                else:
+                    region_filter = "all"
                 fill_field = generate_fill_strokes(
                     self.analysis,
                     density=options.stroke_density,
                     brush_min=float(options.brush_size_min),
                     brush_max=float(options.brush_size_max),
                     seed=options.seed + stage_index,
+                    region_filter=region_filter,
                 )
+            elif stage.stage_type == "construction_planning":
+                reveal_map = build_stroke_reveal(self._planning_lines(), rng=stage_rng)
+            elif stage.stage_type == "ink_lines":
+                reveal_map = build_stroke_reveal(self._ink_lines(), rng=stage_rng)
             elif stage.stage_type not in ("hold", "final_hold"):
                 reveal_map = build_reveal_map(reveal_kind, self.analysis, rng=stage_rng)
+
+            if stage.stage_type == "construction_sketch":
+                correction_mask = self._correction_mask()[:, :, None]
 
             for frame_index in range(frame_count):
                 if should_cancel and should_cancel() and frame_index % 8 == 0:
@@ -419,6 +596,18 @@ class TimelapseRenderer:
                     canvas = apply_reveal(previous, target, reveal_map, eased)
                 else:
                     canvas = target
+
+                if correction_mask is not None and 0.55 < raw < 0.82:
+                    # A believable correction: a few marks are rubbed out and
+                    # then redrawn as the erasure pulse passes.
+                    pulse = math.sin(math.pi * (raw - 0.55) / 0.27) * 0.85
+                    blend = correction_mask * pulse
+                    canvas = np.clip(
+                        previous.astype(np.float32) * blend
+                        + canvas.astype(np.float32) * (1.0 - blend),
+                        0,
+                        255,
+                    ).astype(np.uint8)
 
                 frame = self._present(canvas, emitted / float(max(1, total - 1)))
                 if options.show_cursor and stroke_field is not None:

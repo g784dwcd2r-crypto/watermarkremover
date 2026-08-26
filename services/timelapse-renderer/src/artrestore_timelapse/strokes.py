@@ -183,6 +183,7 @@ def generate_fill_strokes(
     brush_max: float = 48.0,
     seed: int = 0,
     max_strokes: int = 4000,
+    region_filter: str = "all",
 ) -> StrokeField:
     """Strokes that block in the base colours the way a painter lays flats.
 
@@ -245,12 +246,33 @@ def generate_fill_strokes(
         _mark(points, stroke_width)
         return True
 
+    # A painter works the subject before the backdrop. Classify each colour
+    # group by how much of it lies in the background, then order: subject
+    # groups (largest first), background groups after - or only one side of
+    # that split when the stage asks for it.
+    subject_groups: list[int] = []
+    background_groups: list[int] = []
     for group in range(group_count):
-        mask = labels == group
-        share = float(mask.mean())
+        selection = labels == group
+        share = float(selection.mean())
         if share < 0.002:
             continue
+        backgroundness = float(analysis.background_mask[selection].mean())
+        # Only large, border-dominated fields count as background; a small
+        # distinctive region is part of the subject even if it touches an
+        # edge - a boat, a reflection, a tree line.
+        is_background = backgroundness > 0.55 and share > 0.08
+        (background_groups if is_background else subject_groups).append(group)
+    if region_filter == "subject":
+        ordered_groups = subject_groups
+    elif region_filter == "background":
+        ordered_groups = background_groups
+    else:
+        ordered_groups = subject_groups + background_groups
 
+    for position, group in enumerate(ordered_groups):
+        mask = labels == group
+        share = float(mask.mean())
         ys, xs = np.nonzero(mask)
         field = _direction_field(mask, xs, ys, rng)
         base_width = float(
@@ -280,7 +302,7 @@ def generate_fill_strokes(
                     field,
                     stroke_width,
                     fill_pass["opacity"],
-                    group
+                    position
                     + pass_index * 0.4
                     + float(row_order[index]) * 0.36
                     + float(rng.uniform(0.0, 0.04)),
@@ -310,10 +332,72 @@ def generate_fill_strokes(
                 field,
                 base_width * 0.7,
                 0.97,
-                group + 0.82 + float(rng.uniform(0.0, 0.12)),
+                position + 0.82 + float(rng.uniform(0.0, 0.12)),
             )
 
     # Normalise the composite keys onto 0..1 while preserving their order.
+    if strokes:
+        ranks = np.argsort(np.argsort([stroke.order for stroke in strokes]))
+        for stroke, rank in zip(strokes, ranks, strict=True):
+            stroke.order = float(rank) / float(len(strokes))
+    return StrokeField(strokes=strokes)
+
+
+def generate_detail_strokes(
+    analysis: ArtworkAnalysis,
+    *,
+    density: float = 1.0,
+    brush_min: float = 4.0,
+    seed: int = 0,
+    max_strokes: int = 2500,
+) -> StrokeField:
+    """Small deliberate strokes for markings and identifying details.
+
+    Seeds land where the artwork has fine structure - markings, patterns,
+    facial features, edges of shapes - weighted toward the subject. Each
+    stroke is short, follows the local edge orientation, and carries the true
+    colour of the finished artwork at that spot, so the distinctive details
+    build up mark by mark and never shift once placed.
+    """
+    rng = np.random.default_rng(seed + 9187)
+    height, width = analysis.rgb.shape[:2]
+
+    interest = analysis.detail_map * (0.45 + 0.55 * analysis.subject_mask)
+    interest = np.clip(interest, 1e-5, None)
+    probabilities = (interest / interest.sum()).reshape(-1)
+
+    area = height * width
+    count = int(np.clip(area / 1400.0 * density, 80, max_strokes))
+    flat_index = rng.choice(area, size=count, replace=True, p=probabilities)
+    seeds_y, seeds_x = np.unravel_index(flat_index, (height, width))
+
+    strokes: list[Stroke] = []
+    for index in range(count):
+        start = (int(seeds_x[index]), int(seeds_y[index]))
+        stroke_width = float(np.clip(brush_min * rng.uniform(0.6, 1.6), 1.5, brush_min * 2.2))
+        steps = int(np.clip(rng.normal(14, 5), 6, 30))
+        points = _walk(analysis.orientation, start, steps, rng, width, height)
+        if len(points) < 2:
+            continue
+
+        base_colour = analysis.rgb[start[1], start[0]].astype(np.float32)
+        jitter = rng.normal(0.0, 1.5, 3).astype(np.float32)
+        colour = np.clip(base_colour + jitter, 0, 255)
+
+        # Strong, distinctive details first (they define the likeness), with
+        # enough jitter that the order never reads as mechanical.
+        salience = float(interest[start[1], start[0]])
+        strokes.append(
+            Stroke(
+                points=points,
+                width=stroke_width,
+                opacity=float(np.clip(rng.normal(0.9, 0.06), 0.6, 1.0)),
+                speed=float(np.clip(rng.normal(1.0, 0.25), 0.4, 2.2)),
+                order=-salience + float(rng.normal(0.0, 0.08)),
+                colour=(int(colour[0]), int(colour[1]), int(colour[2])),
+            )
+        )
+
     if strokes:
         ranks = np.argsort(np.argsort([stroke.order for stroke in strokes]))
         for stroke, rank in zip(strokes, ranks, strict=True):
