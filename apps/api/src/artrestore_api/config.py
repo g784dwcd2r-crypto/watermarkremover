@@ -45,6 +45,21 @@ class Settings(BaseSettings):
     # -- database -----------------------------------------------------------
     database_url: str = "postgresql+psycopg://artrestore:artrestore@localhost:5432/artrestore"
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _normalise_database_url(cls, value: object) -> object:
+        """Accept the plain postgres URLs managed platforms hand out.
+
+        Render, Heroku and friends provide ``postgres://`` or ``postgresql://``
+        connection strings; SQLAlchemy would resolve those to psycopg2, which
+        is not installed. Rewrite them onto the psycopg (v3) driver.
+        """
+        if isinstance(value, str):
+            for prefix in ("postgres://", "postgresql://"):
+                if value.startswith(prefix):
+                    return "postgresql+psycopg://" + value[len(prefix) :]
+        return value
+
     # -- redis / celery -----------------------------------------------------
     redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str = "redis://localhost:6379/1"
