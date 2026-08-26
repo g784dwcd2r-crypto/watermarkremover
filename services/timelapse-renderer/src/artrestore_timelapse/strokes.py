@@ -238,11 +238,7 @@ def generate_fill_strokes(
                     speed=float(np.clip(rng.normal(1.0, 0.25), 0.4, 2.2)),
                     # Group-major, row-minor with jitter: the group index sets
                     # which colour is being laid in, the row sets the pass.
-                    order=(
-                        group
-                        + float(row_order[index]) * 0.9
-                        + float(rng.uniform(0.0, 0.08))
-                    ),
+                    order=(group + float(row_order[index]) * 0.9 + float(rng.uniform(0.0, 0.08))),
                 )
             )
 

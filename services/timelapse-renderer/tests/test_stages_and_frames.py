@@ -190,7 +190,6 @@ def test_stroke_rendering_grows_monotonically(analysis):
 
 def test_fill_strokes_block_in_colour_groups(analysis):
     import cv2
-
     from artrestore_timelapse import generate_fill_strokes
 
     field = generate_fill_strokes(analysis, seed=3)
