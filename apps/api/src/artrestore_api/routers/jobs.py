@@ -15,7 +15,7 @@ from ..db import session_scope
 from ..deps import CSRFProtected, CurrentUser, DbSession, DefaultRateLimit, JobRateLimit
 from ..errors import not_found, validation_error
 from ..logging_setup import log_context
-from ..models import Mask, ProcessingJob
+from ..models import Asset, Mask, ProcessingJob
 from ..queue import TASK_CLEANUP
 from ..schemas import CleanupJobRequest, JobListOut, JobOut
 from ..services import consent as consent_service
@@ -77,8 +77,24 @@ def create_cleanup_job(
             },
         )
 
+    batch_asset_ids: list[str] = []
+    if payload.apply_to_all_sources:
+        rows = db.execute(
+            select(Asset.id)
+            .where(
+                Asset.project_id == project.id,
+                Asset.type == "source",
+                Asset.upload_complete.is_(True),
+            )
+            .order_by(Asset.created_at.asc())
+        ).all()
+        batch_asset_ids = [str(row[0]) for row in rows]
+        if not batch_asset_ids:
+            raise validation_error("This project has no completed source uploads.")
+
     parameters = {
         "mask_version": version,
+        "asset_ids": batch_asset_ids,
         "mode": payload.mode,
         "adjustments": payload.adjustments or {},
         "grain_strength": payload.grain_strength,

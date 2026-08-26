@@ -188,6 +188,33 @@ def test_stroke_rendering_grows_monotonically(analysis):
     assert covered[0] < covered[1] < covered[2]
 
 
+def test_fill_strokes_block_in_colour_groups(analysis):
+    import cv2
+    from artrestore_timelapse import generate_fill_strokes
+
+    field = generate_fill_strokes(analysis, seed=3)
+    assert len(field) > 30
+    orders = [stroke.order for stroke in field.strokes]
+    assert min(orders) >= 0.0 and max(orders) < 1.0
+
+    # Group-major ordering: the largest colour group (label 0) is laid in
+    # before smaller ones, so label index and drawing order correlate.
+    labels = cv2.medianBlur(analysis.palette_labels.astype(np.uint8), 5).astype(np.int32)
+    groups = [int(labels[stroke.points[0][1], stroke.points[0][0]]) for stroke in field.strokes]
+    correlation = float(np.corrcoef(groups, orders)[0, 1])
+    assert correlation > 0.5, "fill strokes should paint colour group by colour group"
+
+
+def test_fill_strokes_are_deterministic(analysis):
+    from artrestore_timelapse import generate_fill_strokes
+
+    first = generate_fill_strokes(analysis, seed=9)
+    second = generate_fill_strokes(analysis, seed=9)
+    assert [stroke.to_dict() for stroke in first.strokes] == [
+        stroke.to_dict() for stroke in second.strokes
+    ]
+
+
 def test_stroke_field_exports_svg(analysis):
     svg = generate_strokes(analysis, seed=2).to_svg(400, 300)
     assert svg.startswith("<svg")

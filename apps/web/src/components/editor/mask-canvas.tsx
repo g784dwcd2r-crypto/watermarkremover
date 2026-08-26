@@ -47,12 +47,20 @@ function regionPoints(points: MaskPoint[] | undefined): number[] {
  */
 export function MaskCanvas({
   imageUrl,
+  fullSize = null,
   protectedRegions = [],
   suggestions = [],
   onSuggestionClick,
   className,
 }: {
   imageUrl: string | null;
+  /**
+   * The source's true pixel dimensions when `imageUrl` is a downscaled
+   * editor preview. The stage keeps working in full-resolution coordinates —
+   * the preview is simply drawn scaled up to fill them — so saved masks are
+   * identical whether the editor displayed the original or the preview.
+   */
+  fullSize?: { width: number; height: number } | null;
   protectedRegions?: DetectedRegion[];
   suggestions?: DetectedRegion[];
   onSuggestionClick?: (region: DetectedRegion) => void;
@@ -89,8 +97,15 @@ export function MaskCanvas({
 
   React.useEffect(() => {
     if (!image) return;
-    setImageSize({ width: image.naturalWidth, height: image.naturalHeight });
-  }, [image, setImageSize]);
+    setImageSize(
+      fullSize && fullSize.width > 0
+        ? { width: fullSize.width, height: fullSize.height }
+        : { width: image.naturalWidth, height: image.naturalHeight },
+    );
+  }, [image, fullSize, setImageSize]);
+
+  const displayScale =
+    image && fullSize && fullSize.width > 0 ? fullSize.width / image.naturalWidth : 1;
 
   React.useEffect(() => {
     const element = containerRef.current;
@@ -272,7 +287,11 @@ export function MaskCanvas({
           onDblTap={() => tool === "polygon" && closePolygon()}
           onWheel={handleWheel}
         >
-          <Layer listening={false}>{image ? <KonvaImage image={image} x={0} y={0} /> : null}</Layer>
+          <Layer listening={false}>
+            {image ? (
+              <KonvaImage image={image} x={0} y={0} scaleX={displayScale} scaleY={displayScale} />
+            ) : null}
+          </Layer>
 
           {showMask ? (
             <Layer listening={false} opacity={1} className="mask-overlay">

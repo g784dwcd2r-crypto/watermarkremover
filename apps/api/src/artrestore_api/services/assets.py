@@ -144,6 +144,30 @@ def finalise_upload(db: Session, *, project: Project, asset: Asset, storage: Sto
         )
     )
 
+    # Very large sources also get a mid-size copy for the mask editor: the
+    # browser displays this one while masks stay in full-resolution
+    # coordinates, so a 50-megapixel scan edits as smoothly as a small file.
+    if max(raster.width, raster.height) > settings.editor_preview_threshold:
+        editor = downscale(raster, settings.editor_preview_max_dimension)
+        editor_key = build_object_key(
+            project.user_id, project.id, "editor_preview", f"{asset.id}.webp"
+        )
+        editor_bytes = encode_raster(editor, mime_type="image/webp", quality=88)
+        storage.put_bytes(editor_key, editor_bytes, "image/webp")
+        db.add(
+            Asset(
+                project_id=project.id,
+                type="editor_preview",
+                storage_key=editor_key,
+                mime_type="image/webp",
+                width=editor.width,
+                height=editor.height,
+                byte_size=len(editor_bytes),
+                upload_complete=True,
+                asset_metadata={"derived_from": asset.id},
+            )
+        )
+
     db.flush()
     logger.info(
         "asset finalised",

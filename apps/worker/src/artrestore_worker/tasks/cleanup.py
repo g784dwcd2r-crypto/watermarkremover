@@ -62,19 +62,38 @@ def run_cleanup_task(self, job_id: str) -> dict:
         job_service.mark_running(session, job)
 
     try:
+        asset_ids = [str(value) for value in (parameters.get("asset_ids") or [])]
+
         with session_scope() as session:
-            source = session.execute(
-                select(Asset)
-                .where(
-                    Asset.project_id == project.id,
-                    Asset.type == "source",
-                    Asset.upload_complete.is_(True),
-                )
-                .order_by(Asset.created_at.asc())
-                .limit(1)
-            ).scalar_one_or_none()
-            if source is None:
-                raise ImagingError("This project has no completed source upload.")
+            # Sources first: "nothing to process" is the more fundamental
+            # problem and the message the user needs when both are missing.
+            if asset_ids:
+                rows = session.execute(
+                    select(Asset).where(
+                        Asset.project_id == project.id,
+                        Asset.id.in_(asset_ids),
+                        Asset.type == "source",
+                        Asset.upload_complete.is_(True),
+                    )
+                ).scalars()
+                by_id = {str(asset.id): asset.storage_key for asset in rows}
+                source_keys = [(aid, by_id[aid]) for aid in asset_ids if aid in by_id]
+                if not source_keys:
+                    raise ImagingError("None of the requested uploads exist any more.")
+            else:
+                source = session.execute(
+                    select(Asset)
+                    .where(
+                        Asset.project_id == project.id,
+                        Asset.type == "source",
+                        Asset.upload_complete.is_(True),
+                    )
+                    .order_by(Asset.created_at.asc())
+                    .limit(1)
+                ).scalar_one_or_none()
+                if source is None:
+                    raise ImagingError("This project has no completed source upload.")
+                source_keys = [(str(source.id), source.storage_key)]
 
             mask_row = session.execute(
                 select(Mask).where(
@@ -84,20 +103,12 @@ def run_cleanup_task(self, job_id: str) -> dict:
             ).scalar_one_or_none()
             if mask_row is None:
                 raise ImagingError("The requested mask version no longer exists.")
-            source_key = source.storage_key
             editor_state = dict(mask_row.editor_state or {})
             mask_version = mask_row.version
 
-        reporter.report(0.02, "Loading image", force=True)
-        raster = load_safe_raster(
-            storage.get_bytes(source_key), max_pixels=settings.max_image_pixels
-        )
-
-        raw_mask = rasterize_editor_state(editor_state, raster.width, raster.height)
         adjustments = MaskAdjustments.from_dict(
             parameters.get("adjustments") or editor_state.get("adjustments")
         )
-
         options = CleanupOptions(
             mode=str(parameters.get("mode", "fast_fill")),
             adjustments=adjustments,
@@ -112,23 +123,81 @@ def run_cleanup_task(self, job_id: str) -> dict:
             backend_settings=settings.backend_settings,
         )
 
-        result = run_cleanup(
-            raster,
-            raw_mask,
-            options,
-            progress=lambda fraction, message: reporter.report(0.05 + fraction * 0.75, message),
-            should_cancel=reporter.should_cancel,
-        )
+        batch = len(source_keys) > 1
+        items: list[dict] = []
+        payload: dict = {}
+        total = len(source_keys)
+
+        for index, (source_asset_id, source_key) in enumerate(source_keys):
+            base = index / float(total)
+            span = 1.0 / float(total)
+            position = f" ({index + 1}/{total})" if batch else ""
+            try:
+                reporter.report(base * 0.85 + 0.02, f"Loading image{position}", force=True)
+                raster = load_safe_raster(
+                    storage.get_bytes(source_key), max_pixels=settings.max_image_pixels
+                )
+                # The declarative mask scales to each image's dimensions, so
+                # one selection covers a whole same-framing shoot.
+                raw_mask = rasterize_editor_state(editor_state, raster.width, raster.height)
+
+                result = run_cleanup(
+                    raster,
+                    raw_mask,
+                    options,
+                    progress=lambda fraction, message, _b=base, _s=span, _p=position: (
+                        reporter.report((_b + fraction * _s * 0.9) * 0.85 + 0.05, message + _p)
+                    ),
+                    should_cancel=reporter.should_cancel,
+                )
+                item_payload = _store_results(
+                    project_id=project.id,
+                    user_id=project.user_id,
+                    mask_version=mask_version,
+                    original=raster,
+                    result=result,
+                    storage=storage,
+                    source_asset_id=source_asset_id if batch else None,
+                )
+                items.append(
+                    {"asset_id": source_asset_id, "status": "succeeded", **result.summary()}
+                )
+                payload = item_payload
+            except ImagingError as exc:
+                # In a batch, one refused or failed image (a protected region,
+                # a corrupt file) must not sink the others.
+                if not batch:
+                    raise
+                items.append(
+                    {
+                        "asset_id": source_asset_id,
+                        "status": "failed",
+                        "code": exc.code,
+                        "message": exc.message,
+                        "details": exc.details,
+                    }
+                )
 
         reporter.report(0.85, "Writing results", force=True)
-        payload = _store_results(
-            project_id=project.id,
-            user_id=project.user_id,
-            mask_version=mask_version,
-            original=raster,
-            result=result,
-            storage=storage,
-        )
+        if batch:
+            succeeded = [item for item in items if item["status"] == "succeeded"]
+            failed = [item for item in items if item["status"] == "failed"]
+            if not succeeded:
+                first = failed[0]
+                error = ImagingError(
+                    f"No image in the batch could be processed. First error: {first['message']}",
+                    details={"items": items},
+                )
+                error.code = str(first.get("code") or "batch_all_failed")
+                raise error
+            payload = {
+                "status": "succeeded",
+                "batch": True,
+                "mask_version": mask_version,
+                "items": items,
+                "succeeded_count": len(succeeded),
+                "failed_count": len(failed),
+            }
 
         with session_scope() as session:
             job = session.get(ProcessingJob, job_id)
@@ -186,29 +255,31 @@ def run_cleanup_task(self, job_id: str) -> dict:
         raise exc
 
 
-def _store_results(*, project_id, user_id, mask_version, original, result, storage) -> dict:
+def _store_results(
+    *, project_id, user_id, mask_version, original, result, storage, source_asset_id=None
+) -> dict:
     """Persist the processed image, its previews and the difference map."""
+    # Batch items carry their source asset in the object key so results from
+    # different images of the same run never overwrite each other.
+    stem = f"cleanup-v{mask_version}"
+    if source_asset_id:
+        stem = f"{stem}-{source_asset_id[:8]}"
+
     settings_mime = "image/png"
     processed_bytes = encode_raster(result.raster, mime_type=settings_mime)
-    processed_key = build_object_key(
-        user_id, project_id, "processed", f"cleanup-v{mask_version}.png"
-    )
+    processed_key = build_object_key(user_id, project_id, "processed", f"{stem}.png")
     storage.put_bytes(processed_key, processed_bytes, settings_mime)
 
     previews = build_previews(original, result.raster, max_dimension=1200)
     preview_bytes = encode_raster(previews["after"], mime_type="image/webp", quality=84)
-    preview_key = build_object_key(
-        user_id, project_id, "processed_preview", f"cleanup-v{mask_version}.webp"
-    )
+    preview_key = build_object_key(user_id, project_id, "processed_preview", f"{stem}.webp")
     storage.put_bytes(preview_key, preview_bytes, "image/webp")
 
     difference = difference_map(original, result.raster)
     difference_raster = result.raster.with_rgb(difference)
     difference_raster.alpha = None
     difference_bytes = encode_raster(difference_raster, mime_type="image/webp", quality=70)
-    difference_key = build_object_key(
-        user_id, project_id, "difference", f"cleanup-v{mask_version}.webp"
-    )
+    difference_key = build_object_key(user_id, project_id, "difference", f"{stem}.webp")
     storage.put_bytes(difference_key, difference_bytes, "image/webp")
 
     with session_scope() as session:
@@ -227,7 +298,11 @@ def _store_results(*, project_id, user_id, mask_version, original, result, stora
                     height=dimensions[1],
                     byte_size=len(data),
                     upload_complete=True,
-                    asset_metadata={"mask_version": mask_version, "mode": result.mode},
+                    asset_metadata={
+                        "mask_version": mask_version,
+                        "mode": result.mode,
+                        **({"source_asset_id": source_asset_id} if source_asset_id else {}),
+                    },
                 )
             )
 

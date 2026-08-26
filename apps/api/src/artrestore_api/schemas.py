@@ -347,6 +347,13 @@ class SegmentOut(BaseModel):
 class CleanupJobRequest(BaseModel):
     mask_version: int | None = Field(None, description="Defaults to the latest mask version.")
     mode: Literal["fast_fill", "texture_restore", "edge_aware", "art_mode"] = "fast_fill"
+    apply_to_all_sources: bool = Field(
+        False,
+        description=(
+            "Run the same mask against every completed source upload in the project. "
+            "The mask scales to each image; protected-region checks run per image."
+        ),
+    )
     mask_approved: bool = Field(
         ..., description="Must be true. The user reviews and approves the mask before processing."
     )

@@ -13,6 +13,7 @@ import {
   LiveRegion,
   Select,
   Skeleton,
+  Switch,
   Tabs,
   TabsContent,
   TabsList,
@@ -81,15 +82,27 @@ export default function CleanupEditorPage() {
   const [acknowledged, setAcknowledged] = React.useState<ProtectedKind[]>([]);
   const [suggestions, setSuggestions] = React.useState<DetectedRegion[]>([]);
   const [protectedRegions, setProtectedRegions] = React.useState<DetectedRegion[]>([]);
+  const [applyToAll, setApplyToAll] = React.useState(false);
   const [jobId, setJobId] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
 
+  const sources = (assets.data ?? []).filter(
+    (asset) => asset.type === "source" && asset.upload_complete,
+  );
   const sourcePreview = (assets.data ?? []).find((asset) => asset.type === "source_preview");
   const source = (assets.data ?? []).find((asset) => asset.type === "source");
+  const editorPreview = (assets.data ?? []).find((asset) => asset.type === "editor_preview");
   const processed = (assets.data ?? []).find((asset) => asset.type === "processed_preview");
   const difference = (assets.data ?? []).find((asset) => asset.type === "difference");
-  const imageUrl = source?.download_url ?? sourcePreview?.download_url ?? null;
+  // Very large sources ship a mid-size editor copy; masks stay in the
+  // source's full-resolution coordinates either way.
+  const imageUrl =
+    editorPreview?.download_url ?? source?.download_url ?? sourcePreview?.download_url ?? null;
+  const editorFullSize =
+    editorPreview && source?.width && source?.height
+      ? { width: source.width, height: source.height }
+      : null;
 
   // Autosave the mask a short while after drawing stops.
   React.useEffect(() => {
@@ -160,6 +173,7 @@ export default function CleanupEditorPage() {
         adjustments: store.adjustments,
         seed: 1,
         acknowledged_protected_kinds: acknowledged,
+        apply_to_all_sources: applyToAll && sources.length > 1,
         idempotency_key: newIdempotencyKey("cleanup"),
       });
       setJobId(job.id);
@@ -171,7 +185,7 @@ export default function CleanupEditorPage() {
           : "The cleanup could not be started.",
       );
     }
-  }, [checkMask, startCleanup, mode, store.adjustments, acknowledged]);
+  }, [checkMask, startCleanup, mode, store.adjustments, acknowledged, applyToAll, sources.length]);
 
   useEditorShortcuts({
     onSave: saveNow,
@@ -291,6 +305,7 @@ export default function CleanupEditorPage() {
 
           <MaskCanvas
             imageUrl={imageUrl}
+            fullSize={editorFullSize}
             protectedRegions={protectedRegions}
             suggestions={suggestions}
             onSuggestionClick={(region) =>
@@ -374,6 +389,15 @@ export default function CleanupEditorPage() {
                   description: CLEANUP_MODE_DESCRIPTIONS[key],
                 }))}
               />
+              {sources.length > 1 ? (
+                <Switch
+                  id="cleanup-apply-all"
+                  label={`Apply to all ${sources.length} uploaded images`}
+                  description="The same selection runs against every upload, scaled to each image. Protected-region checks run on every image individually."
+                  checked={applyToAll}
+                  onCheckedChange={setApplyToAll}
+                />
+              ) : null}
               {preview?.suggested_mode && preview.suggested_mode !== mode ? (
                 <Alert tone="info">
                   Based on what surrounds your selection,{" "}

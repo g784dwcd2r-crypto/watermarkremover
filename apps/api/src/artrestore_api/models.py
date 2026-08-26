@@ -34,6 +34,7 @@ PROJECT_STATUSES = ("draft", "ready", "processing", "complete", "failed")
 ASSET_TYPES = (
     "source",  # the untouched upload; never overwritten
     "source_preview",
+    "editor_preview",  # mid-size derived copy so huge sources edit smoothly
     "mask",
     "processed",
     "processed_preview",
