@@ -17,6 +17,7 @@ import numpy as np
 
 from .analysis import ArtworkAnalysis
 from .errors import InvalidPlanError, RenderCancelledError
+from .pen import plan_pen, render_pen
 from .presets import (
     END_CARD_TEXT,
     MAX_DURATION_SECONDS,
@@ -137,6 +138,7 @@ class TimelapseRenderer:
         self._graphite: np.ndarray | None = None
         self._planning: np.ndarray | None = None
         self._ink: np.ndarray | None = None
+        self._jitter_cache: dict[float, np.ndarray] = {}
 
     # -- planning -----------------------------------------------------------
 
@@ -227,6 +229,56 @@ class TimelapseRenderer:
         return np.clip(ink * alpha + base.astype(np.float32) * (1.0 - alpha), 0, 255).astype(
             np.uint8
         )
+
+    def _jittered_lines(self, amount: float) -> np.ndarray:
+        """The line art displaced the way a rough sketch is, cached per amount."""
+        key = round(float(amount), 3)
+        if key not in self._jitter_cache:
+            lines = self.line_art if self.line_art is not None else self.analysis.line_art
+            lines = lines.astype(np.float32) / 255.0
+            shift = self._sketch_jitter(lines.shape, key)
+            lines = cv2.remap(lines, shift[0], shift[1], cv2.INTER_LINEAR)
+            self._jitter_cache[key] = np.clip(cv2.GaussianBlur(lines, (0, 0), 1.2 * key), 0.0, 1.0)
+        return self._jitter_cache[key]
+
+    def _pen_stage_layers(
+        self, stage: Stage
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, int] | None:
+        """For a pen-drawn stage: (underlay, target, the new lines, pen width).
+
+        The underlay is everything already on the canvas at this stage's layer
+        opacities; the target adds the stage's new line layer; the pen only
+        ever reveals along the new lines.
+        """
+        kind = stage.stage_type
+        clean = self.line_art if self.line_art is not None else self.analysis.line_art
+
+        if kind == "construction_planning":
+            planning = self._planning_lines()
+            underlay = self._background()
+            return underlay, self._lines_over(underlay, strength=0.3, lines=planning), planning, 4
+        if kind == "construction_sketch":
+            rough = self._jittered_lines(float(stage.settings.get("jitter", 1.0)))
+            underlay = self._lines_over(
+                self._background(), strength=0.22, lines=self._planning_lines()
+            )
+            return underlay, self._lines_over(underlay, strength=0.45, lines=rough), rough, 5
+        if kind == "refined_lines":
+            underlay = self._lines_over(
+                self._background(), strength=0.07, lines=self._planning_lines()
+            )
+            underlay = self._lines_over(underlay, strength=0.16, lines=self._jittered_lines(1.0))
+            clean_f = clean.astype(np.float32) / 255.0
+            return underlay, self._lines_over(underlay, strength=0.85, lines=clean_f), clean_f, 4
+        if kind == "ink_lines":
+            ink = self._ink_lines()
+            underlay = self._lines_over(
+                self._background(), strength=0.14, lines=self._jittered_lines(1.0)
+            )
+            underlay = self._lines_over(underlay, strength=0.3)
+            target = self._lines_over(underlay, strength=1.0, lines=ink, colour=(30, 29, 36))
+            return underlay, target, ink, 6
+        return None
 
     def _planning_lines(self) -> np.ndarray:
         """Exploratory construction shapes: the marks an artist makes first.
@@ -510,6 +562,7 @@ class TimelapseRenderer:
             fill_cache: dict = {}
             reveal_map = None
             correction_mask = None
+            pen_plan = None
             serial_reveal = False
             pacing = {
                 "element_order": str(stage.settings.get("element_order", "meander")),
@@ -567,12 +620,13 @@ class TimelapseRenderer:
                     pause_fraction=float(stage.settings.get("paint_pauses", 0.04)),
                     late_touchup_fraction=float(stage.settings.get("paint_touchups", 0.0)),
                 )
-            elif stage.stage_type == "construction_planning":
-                reveal_map = build_stroke_reveal(self._planning_lines(), rng=stage_rng, **pacing)
-                serial_reveal = True
-            elif stage.stage_type == "ink_lines":
-                reveal_map = build_stroke_reveal(self._ink_lines(), rng=stage_rng, **pacing)
-                serial_reveal = True
+            elif (pen_layers := self._pen_stage_layers(stage)) is not None:
+                # One pen: the stage's lines are drawn strictly one stroke at
+                # a time along a planned hand path.
+                pen_underlay, pen_target, pen_lines, pen_width = pen_layers
+                pen_plan = plan_pen(pen_lines, rng=stage_rng)
+                pen_cache: dict = {}
+                target = pen_target
             elif reveal_kind == "stroke":
                 lines = self.line_art if self.line_art is not None else self.analysis.line_art
                 reveal_map = build_stroke_reveal(lines, rng=stage_rng, **pacing)
@@ -590,7 +644,27 @@ class TimelapseRenderer:
                 raw = (frame_index + 1) / float(frame_count)
                 eased = ease(options.transition_curve, raw)
 
-                if fill_field is not None:
+                if pen_plan is not None:
+                    # The previous layers settle to their new opacities in the
+                    # first beat (the artist dropping a layer's opacity), then
+                    # the single pen draws the stage's lines.
+                    settle = float(np.clip(raw / 0.1, 0.0, 1.0))
+                    base = np.clip(
+                        pen_underlay.astype(np.float32) * settle
+                        + previous.astype(np.float32) * (1.0 - settle),
+                        0,
+                        255,
+                    ).astype(np.uint8)
+                    pen_progress = float(np.clip((eased - 0.04) / 0.94, 0.0, 1.0))
+                    canvas = render_pen(
+                        base,
+                        target,
+                        pen_plan,
+                        pen_progress,
+                        cache=pen_cache,
+                        line_width=pen_width,
+                    )
+                elif fill_field is not None:
                     # Real pigment, no wash: the painted canvas is allowed to
                     # stay hand-made, and the next stage refines it the way a
                     # painter works over their own flats.
@@ -625,7 +699,7 @@ class TimelapseRenderer:
                 else:
                     canvas = target
 
-                if correction_mask is not None and 0.55 < raw < 0.82:
+                if correction_mask is not None and pen_plan is None and 0.55 < raw < 0.82:
                     # A believable correction: a few marks are rubbed out and
                     # then redrawn as the erasure pulse passes.
                     pulse = math.sin(math.pi * (raw - 0.55) / 0.27) * 0.85
