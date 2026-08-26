@@ -332,6 +332,38 @@ def test_render_starts_blank_and_ends_on_the_artwork(analysis):
     assert difference < 40
 
 
+def test_sketch_ending_never_fades_into_the_source_image(analysis):
+    stages = build_plan("sketch_to_colour", total_seconds=8)
+    renderer = TimelapseRenderer(
+        analysis,
+        stages,
+        RenderOptions(
+            fps=24,
+            seed=3,
+            preview=True,
+            preview_max_side=180,
+            end_card_disclosure=False,
+            background_colour="#FFFFFF",
+        ),
+    )
+    frames = list(renderer.iter_frames())
+
+    import cv2
+
+    # The video ends on the painted canvas, held steady - never on the source
+    # image itself. A crossfade into the finished photograph would collapse
+    # this difference toward zero.
+    source = cv2.resize(analysis.rgb, (renderer.plan.width, renderer.plan.height))
+    difference = float(np.abs(frames[-1].astype(int) - source.astype(int)).mean())
+    assert difference > 2.0, "the final frame matched the source image - the ending faded"
+
+    hold_frames = max(2, int(round(renderer.plan.fps * 0.2)))
+    tail = frames[-hold_frames:]
+    assert all(
+        np.array_equal(tail[0], frame) for frame in tail[1:]
+    ), "the final hold should keep the painted canvas perfectly still"
+
+
 def test_progress_reaches_completion(analysis):
     seen: list[float] = []
     renderer = TimelapseRenderer(
