@@ -479,7 +479,7 @@ class TimelapseRenderRequest(BaseModel):
     brush_size_min: int = Field(6, ge=1, le=256)
     brush_size_max: int = Field(48, ge=1, le=512)
     transition_curve: Literal["linear", "ease_in", "ease_out", "ease_in_out"] = "ease_in_out"
-    hold_final_seconds: float = Field(1.5, ge=0.0, le=30.0)
+    hold_final_seconds: float = Field(2.5, ge=0.0, le=30.0)
     zoom_pan: bool = False
     show_cursor: bool = False
     brand_watermark_asset_id: str | None = None

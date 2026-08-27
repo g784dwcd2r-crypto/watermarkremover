@@ -61,25 +61,24 @@ STAGE_LABELS = {
 _TEMPLATES: dict[str, list[tuple[str, float, dict]]] = {
     # A real workflow, in a real order: a blank moment, exploratory
     # construction shapes, a rough sketch with corrections, a refined sketch
-    # over the fading rough, clean ink with the pencil erased beneath it,
-    # subject colours before background, markings, restrained shading and
-    # highlights, the background late, and a final cleanup pass. Weights
-    # follow the reference timing (planning ~10%, rough ~15%, refined ~15%,
-    # ink ~15%, flats ~15%, markings ~12%, shading ~9%, background ~6%,
-    # cleanup ~3%).
+    # over the fading rough, clean ink with the pencil erased beneath it, then
+    # the painting - which is where a viewer's interest lives, so it carries
+    # ~70% of the runtime. Flats go in far-to-near (sky, then the mountains,
+    # then the water) with the small shapes after, markings place the
+    # identifying details, restrained shading and highlights follow, and a
+    # long finishing pass lingers on the last small decisions.
     "sketch_to_colour": [
-        ("blank_canvas", 0.6, {}),
-        ("construction_planning", 1.1, {}),
-        ("construction_sketch", 2.4, {"reveal": "stroke", "jitter": 1.0}),
-        ("refined_lines", 2.4, {"reveal": "stroke"}),
-        ("ink_lines", 2.1, {"reveal": "stroke"}),
-        ("erase_sketch", 0.4, {"reveal": "dissolve"}),
-        ("base_colours", 2.4, {"reveal": "stroke_fill"}),
-        ("markings", 1.9, {"reveal": "stroke_fill"}),
-        ("shadows", 0.9, {"reveal": "tonal"}),
-        ("highlights", 0.6, {"reveal": "tonal"}),
-        ("background_paint", 1.0, {"reveal": "stroke_fill"}),
-        ("texture_details", 0.5, {"reveal": "detail"}),
+        ("blank_canvas", 0.3, {}),
+        ("construction_planning", 0.6, {}),
+        ("construction_sketch", 1.3, {"reveal": "stroke", "jitter": 1.0}),
+        ("refined_lines", 1.2, {"reveal": "stroke"}),
+        ("ink_lines", 1.2, {"reveal": "stroke"}),
+        ("erase_sketch", 0.25, {"reveal": "dissolve"}),
+        ("base_colours", 5.2, {"reveal": "stroke_fill", "paint_touchups": 0.3}),
+        ("markings", 2.6, {"reveal": "stroke_fill"}),
+        ("shadows", 1.0, {"reveal": "tonal"}),
+        ("highlights", 0.7, {"reveal": "tonal"}),
+        ("texture_details", 1.6, {"reveal": "detail"}),
         ("final_hold", 0.6, {}),
     ],
     "paint_reveal": [
@@ -148,7 +147,7 @@ def build_plan(
     *,
     total_seconds: float,
     intermediate_count: int = 0,
-    hold_final_seconds: float = 1.5,
+    hold_final_seconds: float = 2.5,
 ) -> list[Stage]:
     """Produce the starting timeline for a mode.
 
