@@ -20,7 +20,7 @@ export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
   brush_size_min: 6,
   brush_size_max: 48,
   transition_curve: "ease_in_out",
-  hold_final_seconds: 1.5,
+  hold_final_seconds: 2.5,
   zoom_pan: false,
   show_cursor: false,
   brand_watermark_asset_id: null,

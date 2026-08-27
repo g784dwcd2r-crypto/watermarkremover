@@ -92,8 +92,9 @@ def test_describe_plan_reports_timing_windows():
 
 
 def test_sketch_workflow_follows_a_real_drawing_order():
-    """Planning, rough, refined, ink, erase - all before any colour; the
-    background is painted late, after shading, and cleanup comes last."""
+    """Planning, rough, refined, ink, erase - all before any colour; shading
+    after the flats and markings, and a long finishing pass before the hold.
+    The sketch is the prelude: the painting carries most of the runtime."""
     stages = build_plan("sketch_to_colour", total_seconds=30)
     types = [stage.stage_type for stage in stages]
     sequence = [
@@ -107,12 +108,21 @@ def test_sketch_workflow_follows_a_real_drawing_order():
         "markings",
         "shadows",
         "highlights",
-        "background_paint",
         "texture_details",
     ]
     indices = [types.index(name) for name in sequence]
     assert indices == sorted(indices)
     assert types.index("erase_sketch") < types.index("base_colours")
+
+    sketch_time = sum(
+        stage.duration
+        for stage in stages
+        if stage.stage_type in sequence[: sequence.index("base_colours")]
+    )
+    active_time = sum(stage.duration for stage in stages if stage.stage_type != "final_hold")
+    assert (
+        0.2 <= sketch_time / active_time <= 0.35
+    ), "the sketch should be a prelude, not half the video"
 
 
 def test_hold_stage_keeps_the_canvas_still(analysis):
@@ -275,9 +285,30 @@ def test_fill_strokes_work_element_by_element(analysis):
         element = int(element_map[stroke.points[0][1], stroke.points[0][0]])
         if element >= 0:
             by_element.setdefault(element, []).append(stroke.order)
+    # The threshold leaves room for the deliberate back-and-forth: a slice of
+    # each element's fill work returns after the next element is underway.
     spans = [float(np.std(values)) for values in by_element.values() if len(values) > 5]
     assert len(spans) >= 2
-    assert float(np.mean(spans)) < 0.12, "each sketch element should be painted as one block"
+    assert float(np.mean(spans)) < 0.17, "each sketch element should be painted as one block"
+
+
+def test_fill_strokes_paint_far_to_near(analysis):
+    from artrestore_timelapse import generate_fill_strokes
+
+    field = generate_fill_strokes(analysis, seed=3)
+    # The big fields go in top of the canvas first (sky before mountains
+    # before water). Compare the median start row of the earliest strokes
+    # with the latest strokes among the wide ones.
+    wide = [
+        stroke
+        for stroke in field.strokes
+        if stroke.width > np.median([s.width for s in field.strokes])
+    ]
+    wide.sort(key=lambda stroke: stroke.order)
+    third = max(1, len(wide) // 3)
+    early_rows = np.median([stroke.points[0][1] for stroke in wide[:third]])
+    late_rows = np.median([stroke.points[0][1] for stroke in wide[-third:]])
+    assert early_rows < late_rows, "painting should start at the top of the canvas and move down"
 
 
 def test_fill_strokes_respect_the_sketch_lines(analysis):

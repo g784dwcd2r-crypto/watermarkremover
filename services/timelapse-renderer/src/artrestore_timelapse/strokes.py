@@ -308,7 +308,16 @@ def generate_fill_strokes(
         order_key: float,
     ) -> bool:
         points = _walk_field(
-            element_map, element_id, start, field, stroke_width, rng, width, height
+            element_map,
+            element_id,
+            start,
+            field,
+            stroke_width,
+            rng,
+            width,
+            height,
+            wobble=hand_wobble,
+            reach=hand_reach,
         )
         if len(points) < 3:
             return False
@@ -336,7 +345,8 @@ def generate_fill_strokes(
     # to the nearest element of the same colour so nothing is left bare.
     # Line pixels belong to no element - the brush stops at the ink.
     element_labels = np.full((height, width), -1, np.int32)
-    element_entries: list[tuple[int, float, float]] = []  # (id, share, backgroundness)
+    # (id, share, backgroundness, centroid row)
+    element_entries: list[tuple[int, float, float, float]] = []
     min_area = max(64.0, area * 0.0003)
     next_element = 0
     for group in range(group_count):
@@ -374,30 +384,48 @@ def generate_fill_strokes(
             element_mask = element_labels == element_id
             element_share = float(element_mask.mean())
             backgroundness = float(analysis.background_mask[element_mask].mean())
-            element_entries.append((element_id, element_share, backgroundness))
+            centroid_row = float(np.nonzero(element_mask)[0].mean()) / float(height)
+            element_entries.append((element_id, element_share, backgroundness, centroid_row))
         next_element += len(kept)
 
-    # A painter works the subject before the backdrop, and the big shapes
-    # before the small ones. Only a large, border-dominated field counts as
-    # background; a small distinctive shape is subject even at the edge -
-    # a boat, a reflection, a tree line.
-    subject_elements = [e for e in element_entries if not (e[2] > 0.55 and e[1] > 0.05)]
-    background_elements = [e for e in element_entries if e[2] > 0.55 and e[1] > 0.05]
-    subject_elements.sort(key=lambda entry: -entry[1])
-    background_elements.sort(key=lambda entry: -entry[1])
-    if region_filter == "subject":
-        ordered_elements = subject_elements
-    elif region_filter == "background":
-        ordered_elements = background_elements
+    # The full painting runs in a purposeful, legible order: the big fields
+    # go in far-to-near - top of the canvas first, so the sky comes before
+    # the mountains and the mountains before the water - and the small
+    # shapes follow, largest first, down to the tiniest accents. When a
+    # stage asks for only the subject or only the background, a large
+    # border-dominated field counts as background; a small distinctive shape
+    # is subject even at the edge - a boat, a reflection, a tree line.
+    if region_filter in ("subject", "background"):
+        subject_elements = [e for e in element_entries if not (e[2] > 0.55 and e[1] > 0.05)]
+        background_elements = [e for e in element_entries if e[2] > 0.55 and e[1] > 0.05]
+        subject_elements.sort(key=lambda entry: -entry[1])
+        background_elements.sort(key=lambda entry: -entry[1])
+        ordered_elements = subject_elements if region_filter == "subject" else background_elements
     else:
-        ordered_elements = subject_elements + background_elements
+        fields = sorted((e for e in element_entries if e[1] >= 0.015), key=lambda e: e[3])
+        details = sorted((e for e in element_entries if e[1] < 0.015), key=lambda e: -e[1])
+        ordered_elements = fields + details
 
-    for position, (element_id, share, _) in enumerate(ordered_elements):
+    hand_wobble = 0.06
+    hand_reach = 1.0
+    for position, (element_id, share, _, _) in enumerate(ordered_elements):
         mask = element_labels == element_id
         ys, xs = np.nonzero(mask)
         if len(xs) < 8:
             continue
-        field = _direction_field(mask, xs, ys, rng)
+        # Each subject asks for its own hand movement: compact round shapes
+        # (a sun, a bloom) get strokes that curl around their centre, and
+        # every element gets its own wobble and stroke length - steady long
+        # sweeps for one shape, looser broken marks for another.
+        centred = np.stack([xs - xs.mean(), ys - ys.mean()]).astype(np.float32)
+        eigenvalues = np.linalg.eigvalsh(centred @ centred.T / len(xs))
+        roundness = math.sqrt(max(float(eigenvalues[0]), 1e-6) / max(float(eigenvalues[1]), 1e-6))
+        if share < 0.02 and roundness > 0.62:
+            field = _circular_field(xs, ys, height, width)
+        else:
+            field = _direction_field(mask, xs, ys, rng)
+        hand_wobble = float(rng.uniform(0.035, 0.11))
+        hand_reach = float(rng.uniform(0.8, 1.5))
         # The brush is chosen for the shape: a broad flat for the big
         # fields, a small round for the little elements.
         base_width = float(
@@ -468,13 +496,18 @@ def generate_fill_strokes(
                 gap_indices.add(len(strokes) - 1)
 
     # Bucket = sketch element x pass (block-in, fill, gap-work): one hand
-    # finishes an element before it moves to the next.
+    # finishes an element before it moves to the next. A slice of each
+    # element's fill work is deferred by one element - the hand moves on,
+    # then comes back to correct the shape it just left.
     buckets = []
     for stroke in strokes:
         whole = int(stroke.order)
         frac = stroke.order - whole
         slot = 0 if frac < 0.4 else (1 if frac < 0.8 else 2)
-        buckets.append(whole * 3 + slot)
+        bucket = whole * 3 + slot
+        if slot == 1 and rng.random() < 0.12:
+            bucket += 4
+        buckets.append(bucket)
     _schedule_hand_tour(
         strokes,
         buckets,
@@ -599,6 +632,20 @@ def _direction_field(
     return _DirectionField(cos2=cos2, sin2=sin2, sweep_angle=axis_angle)
 
 
+def _circular_field(xs: np.ndarray, ys: np.ndarray, height: int, width: int) -> _DirectionField:
+    """Strokes that curl around a compact shape - a sun, a bloom, a wheel."""
+    cx, cy = float(xs.mean()), float(ys.mean())
+    grid_x, grid_y = np.meshgrid(
+        np.arange(width, dtype=np.float32), np.arange(height, dtype=np.float32)
+    )
+    theta = np.arctan2(grid_y - cy, grid_x - cx) + math.pi / 2.0
+    return _DirectionField(
+        cos2=np.cos(2.0 * theta).astype(np.float32),
+        sin2=np.sin(2.0 * theta).astype(np.float32),
+        sweep_angle=0.0,
+    )
+
+
 def _walk_field(
     labels: np.ndarray,
     group: int,
@@ -608,6 +655,9 @@ def _walk_field(
     rng: np.random.Generator,
     width: int,
     height: int,
+    *,
+    wobble: float = 0.06,
+    reach: float = 1.0,
 ) -> list[tuple[int, int]]:
     """Follow the region's direction field, stopping at the region's edge.
 
@@ -621,7 +671,7 @@ def _walk_field(
     heading = field.angle_at(start[0], start[1])
     if rng.random() < 0.5:
         heading += math.pi
-    max_steps = int(max(30, width_hint * 4.0 / step))
+    max_steps = int(max(30, width_hint * 4.0 * reach / step))
     off_region = 0
 
     for _ in range(max_steps):
@@ -633,7 +683,7 @@ def _walk_field(
         delta = math.atan2(math.sin(target - heading), math.cos(target - heading))
         if abs(delta) > math.pi / 2:
             delta = math.atan2(math.sin(delta + math.pi), math.cos(delta + math.pi))
-        heading += delta * 0.5 + float(rng.normal(0.0, 0.06))
+        heading += delta * 0.5 + float(rng.normal(0.0, wobble))
 
         x += math.cos(heading) * step
         y += math.sin(heading) * step

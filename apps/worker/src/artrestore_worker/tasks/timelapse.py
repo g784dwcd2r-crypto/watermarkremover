@@ -693,7 +693,7 @@ def _load_stages(project_id: str, parameters: dict) -> list[Stage]:
             str(parameters.get("mode", "sketch_to_colour")),
             total_seconds=float(parameters.get("duration_seconds", 12.0)),
             intermediate_count=_intermediate_count(project_id),
-            hold_final_seconds=float(parameters.get("hold_final_seconds", 1.5)),
+            hold_final_seconds=float(parameters.get("hold_final_seconds", 2.5)),
         )
     # Drawing speed compresses or stretches the whole timeline at render time
     # without touching the stored stages the user edits.

@@ -596,7 +596,7 @@ class TimelapseRenderer:
                 # The finishing pass is the same brush laying a sparser set of
                 # last touches over the painted canvas - never a fade into the
                 # source image.
-                detail_share = 0.45 if stage.stage_type == "texture_details" else 1.0
+                detail_share = 0.6 if stage.stage_type == "texture_details" else 1.0
                 fill_field = generate_detail_strokes(
                     self.analysis,
                     density=options.stroke_density
